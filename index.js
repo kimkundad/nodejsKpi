@@ -412,9 +412,17 @@ app.get('/getBooksByCollectionID', async (req, res) => {
   try {
     const collectionID = req.query.collectionID;
     console.log('collectionID', collectionID);
+
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
+        const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
+        const offset = (page - 1) * pageSize; // Offset calculation
     
-    // Fetch books by collectionID
-    const [books] = await connection.query('SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC', [collectionID]);
+    // Fetch books by collectionID with pagination
+const [books] = await connection.query(
+  'SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
+  [collectionID, pageSize, offset]
+);
 
     // Object to hold formatted responses for books
     const formattedBooks = [];
