@@ -4,6 +4,31 @@ const { sql, poolPromise } = require('./dbPool');
 const connectionMysql = require('./mysqlConfig');
 const { addJob, addJobrecomment, addJobTop } = require('./jobHandlers');
 
+router.get('/dataCount', async (req, res) => {
+    let connection;
+    try {
+      connection = await poolPromise;
+  
+      const result = await connection.request()
+        .query(`
+          SELECT COUNT(*) AS TotalRows
+          FROM EBib
+          JOIN EEtcBib ON EBib.BibId = EEtcBib.EBBibId
+          JOIN EEtc ON EEtcBib.EBEtcId = EEtc.EtcId
+          JOIN ENte ON EEtcBib.EBBibId = ENte.NteBibId
+          JOIN ECvr ON EEtcBib.EBBibId = ECvr.CvrBibId
+          WHERE ENte.NteTag = 505 OR ENte.NteTag = 500
+        `);
+  
+      const totalCount = result.recordset[0].TotalRows;
+  
+      res.json({ totalCount });
+    } catch (error) {
+      console.error('Error fetching count:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
 router.get('/data', async (req, res) => {
   try {
     const { page = 1, pageSize = 10 } = req.query;
@@ -74,27 +99,34 @@ router.get('/Addrecomment', async (req, res) => {
   }
 });
 
+
 router.get('/getNewBooks', async (req, res) => {
-  let connection;
-  try {
-    connection = await connectionMysql.getConnection();
-    const { page = 1, pageSize = 10 } = req.query;
-    const offset = (page - 1) * pageSize;
-    const [result] = await connection.query(
-      `SELECT * FROM books 
-       WHERE image IS NOT NULL AND image != '' 
-       ORDER BY EntrDate DESC 
-       LIMIT ? OFFSET ?`,
-      [pageSize, offset]
-    );
-    res.json(result);
-  } catch (error) {
-    console.error('Error fetching new books:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  } finally {
-    if (connection) connection.release();
-  }
-});
+    let connection;
+    try {
+      connection = await connectionMysql.getConnection();
+  
+      // Pagination parameters
+      const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
+      const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
+      const offset = (page - 1) * pageSize; // Offset calculation
+  
+      // Fetch books with pagination
+      const [result] = await connection.query(
+        `SELECT * FROM books 
+         WHERE image IS NOT NULL AND image != '' 
+         ORDER BY EntrDate DESC 
+         LIMIT ? OFFSET ?`,
+        [parseInt(pageSize), parseInt(offset)]
+      );
+  
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching new books:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+      if (connection) connection.release();
+    }
+  });
 
 
 router.get('/getRecommentBooks', async (req, res) => {
