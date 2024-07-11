@@ -70,6 +70,7 @@ const worker = new Worker('jobQueue', async (job) => {
     }
   }
   
+  
   if(job.name === 'job'){
 
      // Modify data to remove '\a' from CallNumber and bookName
