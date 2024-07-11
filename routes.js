@@ -49,6 +49,7 @@ router.get('/data', async (req, res) => {
         `);
 
       if (result.recordset.length > 0) {
+        console.log('Processing data job xx:', startNum);
         allResults = allResults.concat(result.recordset);
         await addJob(result.recordset);
       }

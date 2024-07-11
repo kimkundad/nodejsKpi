@@ -36,7 +36,7 @@ const worker = new Worker('jobQueue', async (job) => {
 
     if (job.name === 'TopBook') {
       // Process the job
-      console.log('Processing TopBook job xx:', job.data);
+    //  console.log('Processing TopBook job xx:', job.data);
 
       let connection1;
       try {
@@ -69,7 +69,7 @@ const worker = new Worker('jobQueue', async (job) => {
       await updateRecommentBook(item);
     }
   }
-  
+
   
   if(job.name === 'job'){
 
