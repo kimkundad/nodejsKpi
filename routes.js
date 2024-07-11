@@ -11,11 +11,12 @@ router.get('/data', async (req, res) => {
     const pool = await poolPromise;
 
     const getCount = await pool.request().query(`
-      SELECT COUNT(*) AS TotalRows
-      FROM EBib
-      JOIN EEtcBib ON EBib.BibId = EEtcBib.EBBibId
-    `);
-    const maxNum = getCount.rowsAffected[0];
+        SELECT COUNT(*) AS TotalRows
+        FROM EBib
+        JOIN EEtcBib ON EBib.BibId = EEtcBib.EBBibId
+      `);
+      
+      const maxNum = getCount.recordset[0].TotalRows;
     let allResults = [];
 
     for (let startNum = 1; startNum <= maxNum; startNum++) {
