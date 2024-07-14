@@ -382,7 +382,7 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         [collectionID, pageSize, offset]
       );
 
-      const totalBooks = await connection.query(
+      const [totalBooks] = await connection.query(
         'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
         [collectionID]
       );
@@ -448,12 +448,12 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         bookPdf: pdfBooksMap[book.bookId] || []
       }));
 
-
-      const response = {
-        totalBooks: totalBooks,
-        items: formattedBooks
-      };
-  
+      const response = [
+        {
+          totalBooks: totalBooks,
+          items: formattedBooks
+        }
+      ];
       // Send formatted books as JSON response
       res.json(response);
   
