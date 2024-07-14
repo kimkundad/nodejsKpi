@@ -381,6 +381,11 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         'SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
         [collectionID, pageSize, offset]
       );
+
+      const [totalBooks] = await connection.query(
+        'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
+        [collectionID]
+      );
   
       // Collect all bookIds for further queries
       const bookIds = books.map(book => book.bookId);
@@ -442,6 +447,12 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         bookItem: bookItemsMap[book.bookId] || [],
         bookPdf: pdfBooksMap[book.bookId] || []
       }));
+
+
+      const response = {
+        totalBooks: totalBooks,
+        items: formattedBooks
+      };
   
       // Send formatted books as JSON response
       res.json(formattedBooks);
