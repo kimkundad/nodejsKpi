@@ -293,6 +293,14 @@ router.get('/getBooks', async (req, res) => {
       WHERE pdfBook.bookId IN (?)
     `, [bookIds]);
 
+    const [results] = await connection.query(`
+      SELECT *, (SELECT COUNT(*) FROM books) as totalBooks
+      FROM books
+      ORDER BY bookId DESC
+    `);
+
+    const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
+
     // Create a map for quick lookup
     const subjectsMap = subjects.reduce((acc, subject) => {
       if (!acc[subject.bookId]) acc[subject.bookId] = [];
@@ -335,8 +343,16 @@ router.get('/getBooks', async (req, res) => {
       bookPdf: pdfBooksMap[book.bookId] || []
     }));
 
+
+    const response = [
+      {
+        totalBooks: totalBooks,
+        items: formattedBooks
+      }
+    ];
+
     // Send formatted books as JSON response
-    res.json(formattedBooks);
+    res.json(response);
 
   } catch (error) {
     console.error('Error fetching books:', error);
