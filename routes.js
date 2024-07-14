@@ -29,6 +29,8 @@ router.get('/dataCount', async (req, res) => {
     }
   });
 
+  //"totalCount": 31169
+
 router.get('/data', async (req, res) => {
   try {
     const { page = 1, pageSize = 10 } = req.query;
@@ -118,8 +120,15 @@ router.get('/getNewBooks', async (req, res) => {
          LIMIT ? OFFSET ?`,
         [parseInt(pageSize), parseInt(offset)]
       );
+
+      const response = [
+        {
+          totalBooks: pageSize,
+          items: result
+        }
+      ];
   
-      res.json(result);
+      res.json(response);
     } catch (error) {
       console.error('Error fetching new books:', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -145,8 +154,22 @@ router.get('/getRecommentBooks', async (req, res) => {
         ORDER BY b.EntrDate DESC
         LIMIT ? OFFSET ?
       `, [pageSize, offset]);
+
+
+      const [ mytotalBooks ] = await connection.query(`
+        SELECT COUNT(DISTINCT b.bookId) as totalBooks
+        FROM books b
+        INNER JOIN RecommentBook rb ON b.bookId = rb.bookId
+      `);
+
+      const response = [
+        {
+          totalBooks: mytotalBooks,
+          items: result
+        }
+      ];
   
-      res.json(result);
+      res.json(response);
     } catch (error) {
       console.error('Error fetching recommended books:', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -168,10 +191,26 @@ router.get('/getRecommentBooks', async (req, res) => {
         SELECT DISTINCT b.*
         FROM books b
         INNER JOIN TopBook rb ON b.bookId = rb.bookId
+        ORDER BY b.EntrDate DESC
         LIMIT ? OFFSET ?
       `, [pageSize, offset]);
+
+      const [ mytotalBooks ] = await connection.query(`
+        SELECT COUNT(DISTINCT b.bookId) as totalBooks
+        FROM books b
+        INNER JOIN TopBook rb ON b.bookId = rb.bookId
+      `);
+
+      const response = [
+        {
+          totalBooks: mytotalBooks,
+          items: result
+        }
+      ];
   
-      res.json(result);
+      // Send formatted books as JSON response
+      res.json(response);
+
     } catch (error) {
       console.error('Error fetching recommended books:', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -224,7 +263,7 @@ router.get('/getTop', async (req, res) => {
       await addJobTop(result.recordset);
     }
 
-    res.json(result.recordset);
+    res.json(result.TotalCount);
   } catch (error) {
     console.error('Error fetching items:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -382,10 +421,12 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         [collectionID, pageSize, offset]
       );
 
-      const [totalBooks] = await connection.query(
+      const [results] = await connection.query(
         'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
         [collectionID]
       );
+
+      const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
   
       // Collect all bookIds for further queries
       const bookIds = books.map(book => book.bookId);
