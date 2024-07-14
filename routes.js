@@ -382,7 +382,7 @@ router.get('/getBooksByCollectionID', async (req, res) => {
         [collectionID, pageSize, offset]
       );
 
-      const [totalBooks] = await connection.query(
+      const totalBooks = await connection.query(
         'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
         [collectionID]
       );
