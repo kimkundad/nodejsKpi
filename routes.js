@@ -455,7 +455,7 @@ router.get('/getBooksByCollectionID', async (req, res) => {
       };
   
       // Send formatted books as JSON response
-      res.json(formattedBooks);
+      res.json(response);
   
     } catch (error) {
       console.error('Error fetching books by collectionID:', error);
