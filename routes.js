@@ -1034,7 +1034,7 @@ router.get('/add_dataBookslist8090', async (req, res) => {
     const result = await pool.request()
       .input('EBEtcId', sql.Int, 8090)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, 1)
+      .input('pageSize', sql.Int, 10)
       .input('offset', sql.Int, startNum)
       .query(`
         WITH PaginatedData AS (
@@ -1509,13 +1509,14 @@ router.get('/add_dataBookslist99', async (req, res) => {
     const pool = await poolPromise;
 
     // Get the page and pageSize from query parameters or use default values
-    const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
+    const page = parseInt(req.query.page, 10) || 1; // Default to page 1
+    const pageSize = parseInt(req.query.pageSize, 10) || 10; // Default to pageSize 10
     const offset = (page - 1) * pageSize; // Calculate the offset
 
-    const fdata = await pool.request()
-      .input('EBEtcId', sql.Int, 28)
+    const result = await pool.request()
+      .input('EBEtcId', sql.Int, 8090)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, 10)
+      .input('pageSize', sql.Int, pageSize)
       .input('offset', sql.Int, offset)
       .query(`
         WITH PaginatedData AS (
@@ -1530,10 +1531,7 @@ router.get('/add_dataBookslist99', async (req, res) => {
         WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize);
       `);
 
-
-      
-
-    res.json({data: fdata.recordset });
+    res.json({ data: result.recordset });
 
   } catch (error) {
     console.error('Error fetching item data:', error);
@@ -1542,6 +1540,8 @@ router.get('/add_dataBookslist99', async (req, res) => {
     });
   }
 });
+
+
 function formatImageName(imageName) {
   // Extract the numeric part of the image name, assuming it does not include the file extension
   const numericPart = imageName.substring(0, imageName.lastIndexOf('.'));
