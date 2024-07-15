@@ -1027,7 +1027,7 @@ router.get('/add_dataBookslist8090', async (req, res) => {
 
     let maxNum = getCount.recordset[0].TotalRows;
     maxNum + 1;
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
@@ -1516,8 +1516,8 @@ router.get('/add_dataBookslist99', async (req, res) => {
     const result = await pool.request()
       .input('EBEtcId', sql.Int, 8090)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, pageSize)
-      .input('offset', sql.Int, offset)
+      .input('pageSize', sql.Int, 1)
+      .input('offset', sql.Int, 0)
       .query(`
         WITH PaginatedData AS (
           SELECT
