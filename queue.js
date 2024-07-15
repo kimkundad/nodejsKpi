@@ -21,12 +21,25 @@ const connection = {
   port: 6379,
 };
 
+async function clearQueue() {
+  await jobQueue.drain();
+  console.log('Queue has been cleared.');
+}
+
+async function clearCompletedJobs() {
+  const completedJobs = await jobQueue.getJobs(['completed']);
+  for (const job of completedJobs) {
+    await job.remove();
+  }
+  console.log('Completed jobs have been cleared.');
+}
+
 // สร้างคิว
 const jobQueue = new Queue('jobQueue', { connection });
 
 // กำหนด job processor
 const worker = new Worker('jobQueue', async (job) => {
-  console.log(`Processing job ${job.id}:`, job.data);
+ // console.log(`Processing job ${job.id}:`, job.data);
 
   try {
     if (!job.data) {
@@ -73,19 +86,22 @@ const worker = new Worker('jobQueue', async (job) => {
   
   if(job.name === 'job'){
 
+  //  clearQueue().catch(err => console.error('Error clearing queue:', err));
+ // console.log('Processing Recomment job xx:', job.data);
      // Modify data to remove '\a' from CallNumber and bookName
   const modifiedData = job.data.map(item => ({
     ...item,
-    CallNumber: item.CallNumber.replace(/\\[abc]/g, ''),
-    bookName: item.bookName.replace(/\\[abdcxz]/g, ''),
-    Book_Content: item.Book_Content.replace(/\\[abc]/g, ''),
-    CvrFilename: formatImageName(item.CvrFilename),
-    EBInd: item.EBInd.trim()
+  CallNumber: item.CallNumber ? item.CallNumber.replace(/\\[abc]/g, '') : null,
+  bookName: item.bookName ? item.bookName.replace(/\\[abdcxz]/g, '') : null,
+  Book_Content: item.Book_Content ? item.Book_Content.replace(/\\[abc]/g, '') : null,
+  CvrFilename: item.CvrFilename,
+  EBInd: item.EBInd ? item.EBInd.trim() : null
   }));
   
   
   for (const item of modifiedData) {
     const existingRecord = await checkExistingRecord(item.mainID);
+    console.log('Processing Recomment job xx:', item.CvrFilename);
 
     if(item.EBTag == 245){
       if (existingRecord) {
@@ -177,6 +193,21 @@ const worker = new Worker('jobQueue', async (job) => {
 
     
   }
+
+  }
+
+  if(job.name === 'job2'){
+    console.log(`Processing job ${job.id}:`, job.data);
+    const modifiedData = job.data.map(item => ({
+      ...item,
+      CallNumber: item.CallNumber.replace(/\\[abc]/g, ''),
+      bookName: item.bookName.replace(/\\[abdcxz]/g, ''),
+      Book_Content: item.Book_Content.replace(/\\[abc]/g, ''),
+      CvrFilename: formatImageName(item.CvrFilename),
+      EBInd: item.EBInd.trim()
+    }));
+
+    console.log('Processing Recomment job2--->>:', modifiedData);
 
   }
 
@@ -702,7 +733,7 @@ const insertPublicationType = async (item) => {
     const { mainID, CallNumber, bookName, EBEtcId } = item;
     const createdAt = new Date(); // Current timestamp for createdAt
     const updatedAt = new Date(); // Current timestamp for updatedAt
-
+    console.error(`insertPublicationType`, EBEtcId);
     let collectionID = 8;
 
     if(EBEtcId == 44){
@@ -735,7 +766,7 @@ const insertPublicationType = async (item) => {
 
     const query = `
       INSERT INTO books (bookId, PublicationType, collectionID, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?)
     `;
     await connection1.query(query, [mainID, bookName, collectionID, createdAt, updatedAt]);
     await connection1.commit();
@@ -754,6 +785,8 @@ const updatePublicationType = async (item) => {
     await connection1.beginTransaction(); // Begin transaction
     const { mainID, bookName, EBEtcId } = item;
     const updatedAt = new Date(); // Current timestamp for updatedAt
+
+    console.error(`updatePublicationType`, EBEtcId);
 
     let collectionID = 8;
 
@@ -994,7 +1027,7 @@ function formatImageName(imageName) {
 
 // จัดการการเสร็จสิ้นงาน
 worker.on('completed', (job) => {
-  console.log(`Job ${job.id} completed with result:`, job.returnvalue);
+ // console.log(`Job ${job.id} completed with result:`, job.data);
 });
 
 // จัดการการล้มเหลวของงาน
