@@ -443,7 +443,7 @@ router.get('/add_dataBookslist930', async (req, res) => {
           const Ebib = await pool.request()
           .input('bookID', item.bookID)
           .query(`
-          SELECT CalRaw
+          SELECT CalRaw, EntrDate
           FROM EBib
           WHERE BibId = @bookID;
           `);
@@ -468,6 +468,7 @@ router.get('/add_dataBookslist930', async (req, res) => {
             ...record,
             "mainID": item.bookID,
             "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+            "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
             "bookName": record?.EtcRaw ?? null,
             "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
             "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -604,7 +605,7 @@ router.get('/add_dataBookslist28', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -629,6 +630,7 @@ router.get('/add_dataBookslist28', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -767,7 +769,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -792,6 +794,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -930,7 +933,7 @@ router.get('/add_dataBookslist1501', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -955,6 +958,7 @@ router.get('/add_dataBookslist1501', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -1093,7 +1097,7 @@ router.get('/add_dataBookslist8090', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -1118,6 +1122,7 @@ router.get('/add_dataBookslist8090', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -1256,7 +1261,7 @@ router.get('/add_dataBookslist1590', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -1281,6 +1286,7 @@ router.get('/add_dataBookslist1590', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
@@ -1419,7 +1425,7 @@ router.get('/add_dataBookslist29', async (req, res) => {
             const Ebib = await pool.request()
             .input('bookID', item.bookID)
             .query(`
-            SELECT CalRaw
+            SELECT CalRaw, EntrDate
             FROM EBib
             WHERE BibId = @bookID;
             `);
@@ -1444,6 +1450,7 @@ router.get('/add_dataBookslist29', async (req, res) => {
               ...record,
               "mainID": item.bookID,
               "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
               "bookName": record?.EtcRaw ?? null,
               "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
               "ENte": ENte?.recordset[0]?.NteRaw ?? null,
