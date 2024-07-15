@@ -1025,8 +1025,8 @@ router.get('/add_dataBookslist8090', async (req, res) => {
         WHERE EBEtcId = @EBEtcId AND EBTag = @EBTag;
       `);
 
-    const maxNum = getCount.recordset[0].TotalRows;
-    maxNum++;
+    let maxNum = getCount.recordset[0].TotalRows;
+    maxNum + 1;
     for (let startNum = 1; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
