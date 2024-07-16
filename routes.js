@@ -517,7 +517,6 @@ router.get('/add_dataBookslist930', async (req, res) => {
 
 });
 
-
 //เพิ่ม  สิ่งพิมพ์สถาบันพระปกเกล้า 28 930
 router.get('/add_dataBookslist28', async (req, res) => {
   
@@ -542,7 +541,7 @@ router.get('/add_dataBookslist28', async (req, res) => {
     const result = await pool.request()
       .input('EBEtcId', sql.Int, 28)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, 1)
+      .input('pageSize', sql.Int, 0)
       .input('offset', sql.Int, startNum)
       .query(`
         WITH PaginatedData AS (
@@ -699,7 +698,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
 
     const maxNum = getCount.recordset[0].TotalRows;
 
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
@@ -863,7 +862,7 @@ router.get('/add_dataBookslist1501', async (req, res) => {
 
     const maxNum = getCount.recordset[0].TotalRows;
 
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
@@ -1026,7 +1025,7 @@ router.get('/add_dataBookslist8090', async (req, res) => {
       `);
 
     let maxNum = getCount.recordset[0].TotalRows;
-    maxNum + 1;
+
     for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
@@ -1191,7 +1190,7 @@ router.get('/add_dataBookslist1590', async (req, res) => {
 
     const maxNum = getCount.recordset[0].TotalRows;
 
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
@@ -1355,7 +1354,7 @@ router.get('/add_dataBookslist29', async (req, res) => {
 
     const maxNum = getCount.recordset[0].TotalRows;
 
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
