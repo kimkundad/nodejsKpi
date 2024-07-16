@@ -752,7 +752,7 @@ const insertPublicationType = async (item) => {
     const { mainID, CallNumber, bookName, EBEtcId } = item;
     const createdAt = new Date(); // Current timestamp for createdAt
     const updatedAt = new Date(); // Current timestamp for updatedAt
-    console.error(`insertPublicationType`, EBEtcId);
+    console.error(`insertPublicationType`, EBEtcId, '-->', mainID);
     let collectionID = 8;
 
     if(EBEtcId == 44){
@@ -805,7 +805,7 @@ const updatePublicationType = async (item) => {
     const { mainID, bookName, EBEtcId } = item;
     const updatedAt = new Date(); // Current timestamp for updatedAt
 
-    console.error(`updatePublicationType`, EBEtcId);
+    console.error(`updatePublicationType`, EBEtcId, '-->', mainID);
 
     let collectionID = 8;
 
