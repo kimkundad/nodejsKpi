@@ -249,7 +249,7 @@ router.get('/getCollection', async (req, res) => {
     // เพิ่มการนับจำนวนหนังสือสำหรับแต่ละคอลเลคชัน
     for (let i = 0; i < collections.length; i++) {
       const collection = collections[i];
-      const [bookCountResult] = await connection.query('SELECT COUNT(*) AS count FROM books WHERE collectionID = ?', [collection.id]);
+      const [bookCountResult] = await connection.query('SELECT COUNT(*) AS count FROM CollectionBookId WHERE collectionId = ?', [collection.id]);
       collection.bookCount = bookCountResult[0].count;
     }
     res.json(collections);
@@ -398,111 +398,158 @@ router.get('/add_dataBookslist930', async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const result = await pool.request()
+    const getCount = await pool.request()
       .input('EBEtcId', 35798)
       .input('EBTag', 930)
       .query(`
-        SELECT EBBibId
+        SELECT COUNT(*) AS TotalRows
         FROM EEtcBib
-        WHERE EBEtcId = @EBEtcId and EBTag = @EBTag;
+        WHERE EBEtcId = @EBEtcId AND EBTag = @EBTag;
       `);
 
-    const bookIDs = result.recordset.map(row => row.EBBibId);
+    const maxNum = getCount.recordset[0].TotalRows;
 
-    const detailBooksPromises = bookIDs.map(async bookID => {
-      const detailBookResult = await pool.request()
-        .input('EBBibId', bookID)
-        .query(`
-          SELECT EBEtcId, EBInd, EBTag
+    for (let startNum = 1; startNum <= maxNum; startNum++) {
+
+      const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
+
+    const result = await pool.request()
+      .input('EBEtcId', sql.Int, 35798)
+      .input('EBTag', sql.Int, 930)
+      .input('pageSize', sql.Int, 0)
+      .input('offset', sql.Int, startNum)
+      .query(`
+        WITH PaginatedData AS (
+          SELECT
+            EBBibId as EBBibId,
+            ROW_NUMBER() OVER (ORDER BY EBBibId DESC) AS RowNum
           FROM EEtcBib
-          WHERE EBBibId = @EBBibId;
-        `);
-      return detailBookResult.recordset;
-    });
+          WHERE EBEtcId = @EBEtcId AND EBTag = @EBTag
+        )
+        SELECT EBBibId
+        FROM PaginatedData
+        WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize);
+      `);
+    
+    //  const paginatedData = result.recordset;
+    
+        // const result = await pool.request()
+        // .input('EBEtcId', 28)
+        // .input('EBTag', 930)
+        // .query(`
+        //   SELECT EBBibId
+        //   FROM EEtcBib
+        //   WHERE EBEtcId = @EBEtcId and EBTag = @EBTag 
+        //   ORDER BY EBBibId DESC;
+        // `);
+  
+      const bookIDs = result.recordset.map(row => row.EBBibId);
 
-    const detailBooks = await Promise.all(detailBooksPromises);
-
-    const combinedResults = bookIDs.map((bookID, index) => ({
-      bookID,
-      detailBooks: detailBooks[index]
-    }));
-
-
-    const datax = combinedResults.map(async item => {
-      const dataloopin = item.detailBooks.map(async detail => {
-
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
+  
+      const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
-          .input('EtcId', detail.EBEtcId)
+          .input('EBBibId', bookID)
           .query(`
-            SELECT *
-            FROM EEtc
-            WHERE EtcId = @EtcId;
+            SELECT EBEtcId, EBInd, EBTag
+            FROM EEtcBib
+            WHERE EBBibId = @EBBibId;
           `);
-
-
-          const Ebib = await pool.request()
-          .input('bookID', item.bookID)
-          .query(`
-          SELECT CalRaw, EntrDate
-          FROM EBib
-          WHERE BibId = @bookID;
-          `);
-
-          const ENte = await pool.request()
-          .input('bookID', item.bookID)
-          .query(`
-          SELECT NteRaw
-          FROM ENte
-          WHERE NteBibId = @bookID and (ENte.NteTag = 505 OR ENte.NteTag = 500); 
-          `);
-
-          const ECvr = await pool.request()
-          .input('bookID', item.bookID)
-          .query(`
-          SELECT CvrFilename
-          FROM ECvr
-          WHERE CvrBibId = @bookID;
-          `);
-
-          const processedDetailBooks = detailBookResult.recordset.map(record => ({
-            ...record,
-            "mainID": item.bookID,
-            "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
-            "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
-            "bookName": record?.EtcRaw ?? null,
-            "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
-            "ENte": ENte?.recordset[0]?.NteRaw ?? null,
-            "CvrFilename": ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
-            "EBInd": detail?.EBInd ?? null,
-            "EBTag": detail?.EBTag ?? null,
-            "EBEtcId": detail?.EBEtcId ?? null,
-          }));
-    
-        // Assuming detailBookResult.recordset is an array of fetched details
-
-        console.log('ECvr==>>>', item.bookID);
-        await addJob(processedDetailBooks);
-        return {
-          bookID: item.bookID,
-          detailBooks: processedDetailBooks ,
-        };
+        return detailBookResult.recordset;
       });
-    
-      // Wait for all dataloopin promises to resolve for the current item
-      const detailBooksData = await Promise.all(dataloopin);
+  
+      const detailBooks = await Promise.all(detailBooksPromises);
+  
+      const combinedResults = bookIDs.map((bookID, index) => ({
+        bookID,
+        detailBooks: detailBooks[index]
+      }));
+  
+  
+      const datax = combinedResults.map(async item => {
+        const dataloopin = item.detailBooks.map(async detail => {
+  
+          const detailBookResult = await pool.request()
+            .input('EtcId', detail.EBEtcId)
+            .query(`
+              SELECT *
+              FROM EEtc
+              WHERE EtcId = @EtcId;
+            `);
+  
+  
+            const Ebib = await pool.request()
+            .input('bookID', item.bookID)
+            .query(`
+            SELECT CalRaw, EntrDate
+            FROM EBib
+            WHERE BibId = @bookID;
+            `);
+  
+            const ENte = await pool.request()
+            .input('bookID', item.bookID)
+            .query(`
+            SELECT NteRaw
+            FROM ENte
+            WHERE NteBibId = @bookID and (ENte.NteTag = 505 OR ENte.NteTag = 500); 
+            `);
+  
+            const ECvr = await pool.request()
+            .input('bookID', item.bookID)
+            .query(`
+            SELECT CvrFilename
+            FROM ECvr
+            WHERE CvrBibId = @bookID;
+            `);
+  
+            const processedDetailBooks = detailBookResult.recordset.map(record => ({
+              ...record,
+              "mainID": item.bookID,
+              "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+              "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
+              "bookName": record?.EtcRaw ?? null,
+              "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
+              "ENte": ENte?.recordset[0]?.NteRaw ?? null,
+              "CvrFilename": ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
+              "EBInd": detail?.EBInd ?? null,
+              "EBTag": detail?.EBTag ?? null,
+              "EBEtcId": detail?.EBEtcId ?? null,
+            }));
       
-      return detailBooksData;
-    });
+          // Assuming detailBookResult.recordset is an array of fetched details
+  
+          console.log('ECvr==>>>', item.bookID);
+          await addJob(processedDetailBooks);
+          return {
+            bookID: item.bookID,
+            detailBooks: processedDetailBooks ,
+          };
+        });
+      
+        // Wait for all dataloopin promises to resolve for the current item
+        const detailBooksData = await Promise.all(dataloopin);
+        
+        return detailBooksData;
+      });
+      
+      // Wait for all datax promises to resolve
+      const processedData = await Promise.all(datax);
+      
+      // Flatten processedData if needed
+      const flattenedProcessedData = processedData.flat();
+      
+      // Log or send flattenedProcessedData as JSON response
+     // res.json(flattenedProcessedData);
+
+      
+    }
     
-    // Wait for all datax promises to resolve
-    const processedData = await Promise.all(datax);
-    
-    // Flatten processedData if needed
-    const flattenedProcessedData = processedData.flat();
-    
-    // Log or send flattenedProcessedData as JSON response
-    //console.log(flattenedProcessedData);
-    res.json(flattenedProcessedData);
 
 
     
@@ -569,6 +616,14 @@ router.get('/add_dataBookslist28', async (req, res) => {
         // `);
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
+
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -733,6 +788,14 @@ router.get('/add_dataBookslist44', async (req, res) => {
         // `);
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
+
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -847,7 +910,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
 
 //เพิ่ม  พระปกเกล้าศึกษา 1501 930
 router.get('/add_dataBookslist1501', async (req, res) => {
-  
+
   try {
     const pool = await poolPromise;
 
@@ -898,6 +961,14 @@ router.get('/add_dataBookslist1501', async (req, res) => {
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
   
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
+
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
           .input('EBBibId', bookID)
@@ -1061,6 +1132,14 @@ router.get('/add_dataBookslist8090', async (req, res) => {
         // `);
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
+
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -1225,6 +1304,14 @@ router.get('/add_dataBookslist1590', async (req, res) => {
         // `);
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
+
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -1388,6 +1475,14 @@ router.get('/add_dataBookslist29', async (req, res) => {
         // `);
   
       const bookIDs = result.recordset.map(row => row.EBBibId);
+
+      const [resultxx] = await connectionMysql.query(
+        `DELETE FROM CollectionBookId 
+           WHERE BookId = ? `,
+        [parseInt(bookIDs)]
+      );
+    
+      console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
