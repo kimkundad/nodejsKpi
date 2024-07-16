@@ -225,7 +225,7 @@ const checkExistingRecord = async (mainID) => {
   try {
     connection1 = await connectionMysql.getConnection();
     const [rows] = await connection1.query('SELECT * FROM books WHERE bookId = ?', [mainID]);
-    return rows.length > 0;
+    return rows.length > 0 ? true : false;
   } catch (error) {
     throw error;
   } finally {
