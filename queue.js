@@ -101,20 +101,23 @@ const worker = new Worker('jobQueue', async (job) => {
   
   for (const item of modifiedData) {
     const existingRecord = await checkExistingRecord(item.mainID);
-    console.log('Processing Recomment job xx:', item.CvrFilename);
 
     if(item.EBTag == 245){
       if (existingRecord) {
+        console.log('updateData');
         await updateData(item);
       } else {
+        console.log('insertData');
         await insertData(item);
       }
     }
 
     if(item.EBTag == 246){
       if (existingRecord) {
+        console.log('updateNameEn');
         await updateNameEn(item);
       } else {
+        console.log('insertNameEn');
         await insertNameEn(item);
       }
     }
@@ -126,8 +129,10 @@ const worker = new Worker('jobQueue', async (job) => {
       item.bookName = item.bookName.replace(/^\\nEbook\\u%\$UrlRedir0%\//, '/');
 
       if (existingRecord) {
+        console.log('updateEbook');
         await updateEbook(item);
       } else {
+        console.log('insertEbook');
         await insertEbook(item);
       }
 
@@ -137,57 +142,71 @@ const worker = new Worker('jobQueue', async (job) => {
 
     if(item.EBInd == 0 && item.EBTag == 100){
       if (existingRecord) {
+        console.log('updateAuthor');
         await updateAuthor(item);
       } else {
+        console.log('insertAuthor');
         await insertAuthor(item);
       }
     }
 
     if(item.EBTag == 20){
       if (existingRecord) {
+        console.log('updateISBN');
         await updateISBN(item);
       } else {
+        console.log('insertISBN');
         await insertISBN(item);
       }
     }
 
     if(item.EBTag == 260){
       if (existingRecord) {
+        console.log('updateImprint');
         await updateImprint(item);
       } else {
+        console.log('insertImprint');
         await insertImprint(item);
       }
     }
 
     if(item.EBTag == 300){
       if (existingRecord) {
+        console.log('updatePhysical');
         await updatePhysical(item);
       } else {
+        console.log('insertPhysical');
         await insertPhysical(item);
       }
     }
 
     if(item.EBTag == 930){
       if (existingRecord) {
+        console.log('updatePublicationType');
         await updatePublicationType(item);
       } else {
+        console.log('insertPublicationType');
         await insertPublicationType(item);
       }
     }
 
     if(item.EBTag == 850){
       if (existingRecord) {
+        console.log('updateLic');
         await updateLic(item);
       } else {
+        console.log('insertLic');
         await insertLic(item);
       }
     }
 
     if(item.EBInd == 4 && item.EBTag == 650){
+      console.log('updateSubject');
       await updateSubject(item);
     }
 
     if(item.EBInd == 0 && item.EBTag == 700){
+      console.log('updateAdditionalAuthors');
       await updateAdditionalAuthors(item);
     }
 
