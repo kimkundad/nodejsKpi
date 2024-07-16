@@ -1297,7 +1297,6 @@ router.get('/add_dataBookslist1590', async (req, res) => {
       
           // Assuming detailBookResult.recordset is an array of fetched details
   
-          console.log('ECvr==>>>', item.bookID);
           await addJob(processedDetailBooks);
           return {
             bookID: item.bookID,
