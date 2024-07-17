@@ -181,7 +181,12 @@ const worker = new Worker('jobQueue', async (job) => {
     }
 
     if(item.EBTag == 930){
-      await updatePublicationType(item);
+      await updatePublicationType2(item);
+      if (existingRecord) {
+        await updatePublicationType(item);
+      } else {
+        await insertPublicationType(item);
+      }
     }
 
     if(item.EBTag == 850){
@@ -738,60 +743,120 @@ const updatePhysical = async (item) => {
   }
 };
 
-// const insertPublicationType = async (item) => {
-//   let connection1;
-//   try {
-//     connection1 = await connectionMysql.getConnection();
-//     await connection1.beginTransaction();
-//     const { mainID, CallNumber, bookName, EBEtcId } = item;
-//     const createdAt = new Date(); // Current timestamp for createdAt
-//     const updatedAt = new Date(); // Current timestamp for updatedAt
-//     console.error(`insertPublicationType`, EBEtcId, '-->', mainID);
-//     let collectionID = 8;
+const insertPublicationType = async (item) => {
+  let connection1;
+  try {
+    connection1 = await connectionMysql.getConnection();
+    await connection1.beginTransaction();
+    const { mainID, CallNumber, bookName, EBEtcId } = item;
+    const createdAt = new Date(); // Current timestamp for createdAt
+    const updatedAt = new Date(); // Current timestamp for updatedAt
+    console.error(`insertPublicationType`, EBEtcId, '-->', mainID);
+    let collectionID = 8;
 
-//     if(EBEtcId == 44){
-//       collectionID = 3;
-//     }
-//     if(EBEtcId == 35798){
-//       collectionID = 1;
-//     }
-//     if(EBEtcId == 28){
-//       collectionID = 2;
-//     }
-//     if(EBEtcId == 1590){
-//       collectionID = 4;
-//     }
-//     if(EBEtcId == 1501){
-//       collectionID = 5;
-//     }
-//     if(EBEtcId == 8090){
-//       collectionID = 6;
-//     }
-//     if(EBEtcId == 29){
-//       collectionID = 7;
-//     }
-//     if(EBEtcId == 1534){
-//       collectionID = 9;
-//     }
-//     if(EBEtcId == 34153415){
-//       collectionID = 10;
-//     }
+    if(EBEtcId == 44){
+      collectionID = 3;
+    }
+    if(EBEtcId == 35798){
+      collectionID = 1;
+    }
+    if(EBEtcId == 28){
+      collectionID = 2;
+    }
+    if(EBEtcId == 1590){
+      collectionID = 4;
+    }
+    if(EBEtcId == 1501){
+      collectionID = 5;
+    }
+    if(EBEtcId == 8090){
+      collectionID = 6;
+    }
+    if(EBEtcId == 29){
+      collectionID = 7;
+    }
+    if(EBEtcId == 1534){
+      collectionID = 9;
+    }
+    if(EBEtcId == 34153415){
+      collectionID = 10;
+    }
 
-//     const query = `
-//       INSERT INTO books (bookId, PublicationType, collectionID, createdAt, updatedAt)
-//       VALUES (?, ?, ?, ?, ?)
-//     `;
-//     await connection1.query(query, [mainID, bookName, collectionID, createdAt, updatedAt]);
-//     await connection1.commit();
-//   } catch (error) {
-//     await connection1.rollback();
-//     throw error;
-//   } finally {
-//     if (connection1) connection1.release();
-//   }
-// };
+    const query = `
+      INSERT INTO books (bookId, PublicationType, collectionID, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    await connection1.query(query, [mainID, bookName, collectionID, createdAt, updatedAt]);
+    await connection1.commit();
+  } catch (error) {
+    await connection1.rollback();
+    throw error;
+  } finally {
+    if (connection1) connection1.release();
+  }
+};
 
 const updatePublicationType = async (item) => {
+  let connection1;
+  try {
+    connection1 = await connectionMysql.getConnection();
+    await connection1.beginTransaction(); // Begin transaction
+    const { mainID, bookName, EBEtcId } = item;
+    const updatedAt = new Date(); // Current timestamp for updatedAt
+
+    console.error(`updatePublicationType`, EBEtcId);
+
+    let collectionID = 8;
+
+    if(EBEtcId == 44){
+      collectionID = 3;
+    }
+    if(EBEtcId == 35798){
+      collectionID = 1;
+    }
+    if(EBEtcId == 28){
+      collectionID = 2;
+    }
+    if(EBEtcId == 1590){
+      collectionID = 4;
+    }
+    if(EBEtcId == 1501){
+      collectionID = 5;
+    }
+    if(EBEtcId == 8090){
+      collectionID = 6;
+    }
+    if(EBEtcId == 29){
+      collectionID = 7;
+    }
+    if(EBEtcId == 1534){
+      collectionID = 9;
+    }
+    if(EBEtcId == 34153415){
+      collectionID = 10;
+    }
+
+    const query = `
+      UPDATE books
+      SET PublicationType = ?, collectionID = ?, updatedAt = ?
+      WHERE bookId = ?
+    `;
+
+    await connection1.query(query, [bookName, collectionID, updatedAt, mainID]); // Execute update query
+    await connection1.commit(); // Commit transaction
+  } catch (error) {
+    if (connection1) {
+      await connection1.rollback(); // Rollback transaction on error
+    }
+    throw error; // Throw the error for handling in the calling function
+  } finally {
+    if (connection1) {
+      connection1.release(); // Release the connection back to the pool
+    }
+  }
+};
+
+const updatePublicationType2 = async (item) => {
   let connection1;
   try {
     connection1 = await connectionMysql.getConnection();

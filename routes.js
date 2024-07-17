@@ -174,18 +174,22 @@ router.get('/getRecommentBooks', async (req, res) => {
       `, [pageSize, offset]);
 
 
-    const [mytotalBooks] = await connection.query(`
+      const [totalBooksResult] = await connection.query(`
         SELECT COUNT(DISTINCT b.bookId) as totalBooks
         FROM books b
         INNER JOIN RecommentBook rb ON b.bookId = rb.bookId
       `);
+      
+      const totalBooks = totalBooksResult[0].totalBooks; // Extract the totalBooks value
+      
+      const response = {
+        totalBooks: totalBooks,
+        items: result
+      };
+      
+      res.json(response);
 
-    const response = [{
-      totalBooks: mytotalBooks,
-      items: result
-    }];
 
-    res.json(response);
   } catch (error) {
     console.error('Error fetching recommended books:', error);
     res.status(500).json({
@@ -213,16 +217,18 @@ router.get('/getTopBooks', async (req, res) => {
         LIMIT ? OFFSET ?
       `, [pageSize, offset]);
 
-    const [mytotalBooks] = await connection.query(`
+    const [totalBooksResult] = await connection.query(`
         SELECT COUNT(DISTINCT b.bookId) as totalBooks
         FROM books b
         INNER JOIN TopBook rb ON b.bookId = rb.bookId
       `);
 
-    const response = [{
-      totalBooks: mytotalBooks,
+      const totalBooks = totalBooksResult[0].totalBooks; // Extract the totalBooks value
+
+    const response = {
+      totalBooks: totalBooks,
       items: result
-    }];
+    };
 
     // Send formatted books as JSON response
     res.json(response);
@@ -252,7 +258,14 @@ router.get('/getCollection', async (req, res) => {
       const [bookCountResult] = await connection.query('SELECT COUNT(*) AS count FROM CollectionBookId WHERE collectionId = ?', [collection.id]);
       collection.bookCount = bookCountResult[0].count;
     }
-    res.json(collections);
+
+    const responsez = {
+      collections
+    };
+    // Send formatted books as JSON response
+    res.json(responsez);
+
+   // res.json(collections);
   } catch (error) {
     console.error('Error fetching getCollection', error);
     res.status(500).json({
@@ -409,14 +422,14 @@ router.get('/add_dataBookslist930', async (req, res) => {
 
     const maxNum = getCount.recordset[0].TotalRows;
 
-    for (let startNum = 1; startNum <= maxNum; startNum++) {
+    for (let startNum = 0; startNum <= maxNum; startNum++) {
 
       const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
 
     const result = await pool.request()
       .input('EBEtcId', sql.Int, 35798)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, 0)
+      .input('pageSize', sql.Int, 1)
       .input('offset', sql.Int, startNum)
       .query(`
         WITH PaginatedData AS (
@@ -588,7 +601,7 @@ router.get('/add_dataBookslist28', async (req, res) => {
     const result = await pool.request()
       .input('EBEtcId', sql.Int, 28)
       .input('EBTag', sql.Int, 930)
-      .input('pageSize', sql.Int, 0)
+      .input('pageSize', sql.Int, 1)
       .input('offset', sql.Int, startNum)
       .query(`
         WITH PaginatedData AS (
@@ -623,7 +636,7 @@ router.get('/add_dataBookslist28', async (req, res) => {
         [parseInt(bookIDs)]
       );
     
-      console.log('bookIDs-->', resultxx)
+     // console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -795,7 +808,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
         [parseInt(bookIDs)]
       );
     
-      console.log('bookIDs-->', resultxx)
+      // console.log('bookIDs-->', resultxx)
   
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -868,7 +881,7 @@ router.get('/add_dataBookslist44', async (req, res) => {
       
           // Assuming detailBookResult.recordset is an array of fetched details
   
-          console.log('ECvr==>>>', item.bookID);
+         // console.log('ECvr==>>>', item.bookID);
           await addJob(processedDetailBooks);
           return {
             bookID: item.bookID,
@@ -967,7 +980,7 @@ router.get('/add_dataBookslist1501', async (req, res) => {
         [parseInt(bookIDs)]
       );
     
-      console.log('bookIDs-->', resultxx)
+    //  console.log('bookIDs-->', resultxx)
 
       const detailBooksPromises = bookIDs.map(async bookID => {
         const detailBookResult = await pool.request()
@@ -1843,10 +1856,10 @@ router.get('/getBooksByCollectionID', async (req, res) => {
       bookPdf: pdfBooksMap[book.bookId] || []
     }));
 
-    const response = [{
+    const response = {
       totalBooks: totalBooks,
       items: formattedBooks
-    }];
+    };
     // Send formatted books as JSON response
     res.json(response);
 
