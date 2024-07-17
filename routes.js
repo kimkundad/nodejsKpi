@@ -139,10 +139,10 @@ router.get('/getNewBooks', async (req, res) => {
       [parseInt(pageSize), parseInt(offset)]
     );
 
-    const response = [{
+    const response = {
       totalBooks: pageSize,
       items: result
-    }];
+    };
 
     res.json(response);
   } catch (error) {
