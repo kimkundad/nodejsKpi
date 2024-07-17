@@ -1752,10 +1752,10 @@ router.get('/getBooks', async (req, res) => {
     }));
 
 
-    const response = [{
+    const response = {
       totalBooks: totalBooks,
       items: formattedBooks
-    }];
+    };
 
     // Send formatted books as JSON response
     res.json(response);
