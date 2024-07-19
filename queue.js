@@ -75,6 +75,62 @@ const worker = new Worker('jobQueue', async (job) => {
       }
     }
 
+    if (job.name === 'TopBookW') {
+
+      let connection1;
+      try {
+        connection1 = await connectionMysql.getConnection();
+        await connection1.beginTransaction();
+        
+        const { ItemBib, ItemNo, TotalCount } = job.data;
+        // Delete existing records based on conditions
+        const deleteQuery = `
+          DELETE FROM topWeek
+        `;
+        await connection1.query(deleteQuery, [ItemBib]);
+
+      } catch (error) {
+        if (connection1) await connection1.rollback();
+        throw error;
+      } finally {
+        if (connection1) connection1.release();
+      }
+
+      for (const item of job.data) {
+        console.log('Processing TopBookW : ', job.data);
+        await updateTopBookW(item);
+      }
+
+    }
+
+    if (job.name === 'TopBookM') {
+
+      let connection1;
+      try {
+        connection1 = await connectionMysql.getConnection();
+        await connection1.beginTransaction();
+        
+        const { ItemBib, ItemNo, TotalCount } = job.data;
+        // Delete existing records based on conditions
+        const deleteQuery = `
+          DELETE FROM topMonth
+        `;
+        await connection1.query(deleteQuery, [ItemBib]);
+
+      } catch (error) {
+        if (connection1) await connection1.rollback();
+        throw error;
+      } finally {
+        if (connection1) connection1.release();
+      }
+
+      for (const item of job.data) {
+        console.log('Processing topMonth : ', job.data);
+        await updateTopBookM(item);
+      }
+
+    }
+
   if (job.name === 'Recomment') {
     // Process the job
     console.log('Processing Recomment job xx:', job.data);
@@ -1089,6 +1145,57 @@ const updateTopBook = async (item) => {
 
 }
 
+const updateTopBookW = async (item) => {
+
+
+  let connection1;
+  try {
+    connection1 = await connectionMysql.getConnection();
+    await connection1.beginTransaction();
+    
+    const { ItemBib, ItemNo, TotalCount } = item;
+    // Insert new records
+    const insertQuery = `
+      INSERT INTO topWeek (bookId, ItemNo, TotalCount)
+      VALUES (?, ?, ?)
+    `;
+    await connection1.query(insertQuery, [ItemBib, ItemNo, TotalCount]);
+
+    await connection1.commit();
+  } catch (error) {
+    if (connection1) await connection1.rollback();
+    throw error;
+  } finally {
+    if (connection1) connection1.release();
+  }
+
+}
+
+const updateTopBookM = async (item) => {
+
+
+  let connection1;
+  try {
+    connection1 = await connectionMysql.getConnection();
+    await connection1.beginTransaction();
+    
+    const { ItemBib, ItemNo, TotalCount } = item;
+    // Insert new records
+    const insertQuery = `
+      INSERT INTO topMonth (bookId, ItemNo, TotalCount)
+      VALUES (?, ?, ?)
+    `;
+    await connection1.query(insertQuery, [ItemBib, ItemNo, TotalCount]);
+
+    await connection1.commit();
+  } catch (error) {
+    if (connection1) await connection1.rollback();
+    throw error;
+  } finally {
+    if (connection1) connection1.release();
+  }
+
+}
 
 function formatImageName(imageName) {
   // Extract the numeric part of the image name, assuming it does not include the file extension

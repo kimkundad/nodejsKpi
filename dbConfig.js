@@ -11,6 +11,7 @@ const config = {
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true',  // Convert string to boolean
   },
+  connectionTimeout: 30000 // 30 seconds
 };
   
   module.exports = config;

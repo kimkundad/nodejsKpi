@@ -20,4 +20,17 @@ const addJobTop = async (jobData) => {
   await jobQueue.add('TopBook', jobData);
 };
 
-module.exports = { addJob, addJob2, addJobrecomment, addJobTop };
+const addJobTopW = async (jobData) => {
+  //  console.log('Job added Top Book:', jobData);
+    await jobQueue.add('TopBookW', jobData);
+  };
+
+
+  const addJobTopWM= async (jobData) => {
+    //  console.log('Job added Top Book:', jobData);
+      await jobQueue.add('TopBookM', jobData);
+    };
+  
+
+
+module.exports = { addJob, addJob2, addJobrecomment, addJobTop, addJobTopW, addJobTopWM };

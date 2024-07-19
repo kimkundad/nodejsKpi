@@ -9,7 +9,9 @@ const {
   addJob,
   addJob2,
   addJobrecomment,
-  addJobTop
+  addJobTop,
+  addJobTopW,
+  addJobTopM,
 } = require('./jobHandlers');
 
 const path = require('path');
@@ -296,7 +298,7 @@ router.get('/getTop', async (req, res) => {
       await addJobTop(result.recordset);
     }
 
-    res.json(result.TotalCount);
+    res.json(result.recordset);
   } catch (error) {
     console.error('Error fetching items:', error);
     res.status(500).json({
@@ -305,6 +307,80 @@ router.get('/getTop', async (req, res) => {
   }
 });
 
+router.get('/getTopWeek', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    // Get the current date and the date of the previous week
+    const currentDate = new Date();
+    const lastWeekDate = new Date(currentDate);
+    lastWeekDate.setDate(currentDate.getDate() - 7);
+
+    // Format dates to match SQL Server's datetime format
+    const currentDateString = currentDate.toISOString().split('T')[0];
+    const lastWeekDateString = lastWeekDate.toISOString().split('T')[0];
+
+    // Query to fetch top 40 records grouped by ItemNo for the last week
+    const result = await pool.request().query(`
+      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      FROM CMCirculation CM
+      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
+      WHERE CM.ChkODate BETWEEN '${lastWeekDateString}' AND '${currentDateString}'
+      GROUP BY CM.ItemNo, CI.ItemBib
+      ORDER BY TotalCount DESC
+    `);
+
+    if (result.recordset.length > 0) {
+      await addJobTopW(result.recordset);
+    }
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+
+router.get('/getTopMonth', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    // Get the current date
+    const currentDate = new Date();
+    
+    // Calculate the start and end dates of the last month
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+
+    // Format dates to match SQL Server's datetime format
+    const startOfMonthString = startOfMonth.toISOString().split('T')[0];
+    const endOfMonthString = endOfMonth.toISOString().split('T')[0];
+
+    // Query to fetch top 40 records grouped by ItemNo for the last month
+    const result = await pool.request().query(`
+      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      FROM CMCirculation CM
+      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
+      WHERE CM.ChkODate BETWEEN '${startOfMonthString}' AND '${endOfMonthString}'
+      GROUP BY CM.ItemNo, CI.ItemBib
+      ORDER BY TotalCount DESC
+    `);
+
+    if (result.recordset.length > 0) {
+      await addJobTopWM(result.recordset);
+    }
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
 
 router.get('/get_item', async (req, res) => {
   try {
