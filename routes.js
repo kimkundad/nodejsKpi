@@ -245,6 +245,92 @@ router.get('/getTopBooks', async (req, res) => {
   }
 });
 
+router.get('/getTopBooksWeek', async (req, res) => {
+  let connection;
+  try {
+    connection = await connectionMysql.getConnection();
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const offset = (page - 1) * pageSize;
+
+    // Query to fetch recommended books based on relationships with RecommentBook.bookId
+    const [result] = await connection.query(`
+        SELECT DISTINCT b.*
+        FROM books b
+        INNER JOIN topWeek rb ON b.bookId = rb.bookId
+        ORDER BY b.EntrDate DESC
+        LIMIT ? OFFSET ?
+      `, [pageSize, offset]);
+
+    const [totalBooksResult] = await connection.query(`
+        SELECT COUNT(DISTINCT b.bookId) as totalBooks
+        FROM books b
+        INNER JOIN topWeek rb ON b.bookId = rb.bookId
+      `);
+
+      const totalBooks = totalBooksResult[0].totalBooks; // Extract the totalBooks value
+
+    const response = {
+      totalBooks: totalBooks,
+      items: result
+    };
+
+    // Send formatted books as JSON response
+    res.json(response);
+
+  } catch (error) {
+    console.error('Error fetching recommended books:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get('/getTopBooksMonth', async (req, res) => {
+  let connection;
+  try {
+    connection = await connectionMysql.getConnection();
+    const page = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
+    const offset = (page - 1) * pageSize;
+
+    // Query to fetch recommended books based on relationships with RecommentBook.bookId
+    const [result] = await connection.query(`
+        SELECT DISTINCT b.*
+        FROM books b
+        INNER JOIN topMonth rb ON b.bookId = rb.bookId
+        ORDER BY b.EntrDate DESC
+        LIMIT ? OFFSET ?
+      `, [pageSize, offset]);
+
+    const [totalBooksResult] = await connection.query(`
+        SELECT COUNT(DISTINCT b.bookId) as totalBooks
+        FROM books b
+        INNER JOIN topMonth rb ON b.bookId = rb.bookId
+      `);
+
+      const totalBooks = totalBooksResult[0].totalBooks; // Extract the totalBooks value
+
+    const response = {
+      totalBooks: totalBooks,
+      items: result
+    };
+
+    // Send formatted books as JSON response
+    res.json(response);
+
+  } catch (error) {
+    console.error('Error fetching recommended books:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 
 router.get('/getCollection', async (req, res) => {
 
