@@ -2085,7 +2085,8 @@ router.get('/getBooksByID', async (req, res) => {
       Cmponent: item.Cmponent,
       callNumber: item.callNumber,
       BookCategory: item.BookCategory,
-      image: item.image // Add image to the bookItem
+      image: item.image, // Add image to the bookItem
+      status: 'avaliable'
     }));
 
     // Fetch pdfBooks for the current book
