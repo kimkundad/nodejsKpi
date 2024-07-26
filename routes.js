@@ -502,283 +502,291 @@ router.get('/getCollection', async (req, res) => {
 
 });
 
-//เพิ่มหนังสือมาใหม่ // ECvr
-router.get('/AddNewbooks', async (req, res) => {
+//http://localhost:3000/getBooks?page=1&pageSize=10
+router.get('/getBooks', async (req, res) => {
+  let connection;
   try {
-    const pool = await poolPromise;
+    connection = await connectionMysql.getConnection();
 
-    // Query to fetch top 40 records grouped by ItemNo
-    const maxNum = 100;
-        let allResults = [];
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
+    const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
+    const offset = (page - 1) * pageSize; // Offset calculation
 
-        for (let startNum = 0; startNum <= maxNum; startNum++) {
-            const { page = 1, pageSize = 10 } = req.query;
+    // Fetch books with pagination
+    const [books] = await connection.query(`
+      SELECT *
+      FROM books
+      ORDER BY bookId DESC
+      LIMIT ? OFFSET ?
+    `, [pageSize, offset]);
 
-            // First SQL Server query to get book IDs with pagination
-            const result = await pool.request()
-                .input('pageSize', sql.Int, pageSize)
-                .input('offset', sql.Int, startNum * pageSize)
-                .query(`
-                    WITH Pagination AS (
-                        SELECT EBib.BibId as bookId, ROW_NUMBER() OVER (ORDER BY EBib.BibId DESC) AS RowNum
-                        FROM EBib
-                        INNER JOIN ECvr ON EBib.BibId = ECvr.CvrBibId
-                    )
-                    SELECT bookId
-                    FROM Pagination
-                    WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
-                `);
+    // Fetch all subjects, bookItems, and pdfBooks in parallel
+    const bookIds = books.map(book => book.bookId);
 
-            const bookIDs = result.recordset.map(row => row.bookId);
+    const [subjects] = await connection.query(`
+      SELECT *
+      FROM subject
+      WHERE bookId IN (?)
+    `, [bookIds]);
 
-            if (bookIDs.length === 0) {
-                continue;
-            }
+    const [bookItems] = await connection.query(`
+      SELECT *
+      FROM bookItem
+      WHERE bookId IN (?)
+    `, [bookIds]);
 
-            // MySQL deletion
-            const deleteResult = await connectionMysql.query(
-                `DELETE FROM CollectionBookId WHERE BookId IN (?)`, [bookIDs]
-            );
+    const [pdfBooks] = await connection.query(`
+      SELECT pdfBook.*, typePdf.name AS typeName
+      FROM pdfBook
+      JOIN typePdf ON pdfBook.type = typePdf.id
+      WHERE pdfBook.bookId IN (?)
+    `, [bookIds]);
 
-            console.log('Deleted Book IDs from MySQL:', deleteResult);
+    const [results] = await connection.query(`
+      SELECT *, (SELECT COUNT(*) FROM books) as totalBooks
+      FROM books
+      ORDER BY bookId DESC
+    `);
 
-            // Fetch details for each book ID
-            const detailBooksPromises = bookIDs.map(async bookID => {
-                const detailBookResult = await pool.request()
-                    .input('bookID', sql.Int, bookID)
-                    .query(`
-                        SELECT EBEtcId, EBInd, EBTag
-                        FROM EEtcBib
-                        WHERE EBBibId = @bookID
-                    `);
-                return detailBookResult.recordset;
-            });
+    const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
 
-            const detailBooks = await Promise.all(detailBooksPromises);
+    // Create a map for quick lookup
+    const subjectsMap = subjects.reduce((acc, subject) => {
+      if (!acc[subject.bookId]) acc[subject.bookId] = [];
+      acc[subject.bookId].push({
+        SubCnt: subject.SubCnt,
+        name: subject.name
+      });
+      return acc;
+    }, {});
 
-            const combinedResults = bookIDs.map((bookID, index) => ({
-                bookID,
-                detailBooks: detailBooks[index]
-            }));
+    const bookItemsMap = bookItems.reduce((acc, item) => {
+      if (!acc[item.bookId]) acc[item.bookId] = [];
+      acc[item.bookId].push({
+        ItemNo: item.ItemNo,
+        Cmponent: item.Cmponent,
+        callNumber: item.callNumber,
+        BookCategory: item.BookCategory
+      });
+      return acc;
+    }, {});
 
-            const datax = combinedResults.map(async item => {
-                const dataloopin = item.detailBooks.map(async detail => {
-                    const detailBookResult = await pool.request()
-                        .input('EtcId', detail.EBEtcId)
-                        .query(`
-                            SELECT *
-                            FROM EEtc
-                            WHERE EtcId = @EtcId
-                        `);
+    const pdfBooksMap = pdfBooks.reduce((acc, item) => {
+      if (!acc[item.bookId]) acc[item.bookId] = [];
+      acc[item.bookId].push({
+        pdfName: item.pdfName,
+        MmId: item.MmId,
+        urlPdf: item.urlPdf,
+        type: item.type,
+        typeName: item.typeName
+      });
+      return acc;
+    }, {});
 
-                    const Ebib = await pool.request()
-                        .input('bookID', sql.Int, item.bookID)
-                        .query(`
-                            SELECT CalRaw, EntrDate
-                            FROM EBib
-                            WHERE BibId = @bookID
-                        `);
+    // Format books with related data
+    const formattedBooks = books.map(book => ({
+      ...book,
+      bookName: book.bookName,
+      subjects: subjectsMap[book.bookId] || [],
+      bookItem: bookItemsMap[book.bookId] || [],
+      bookPdf: pdfBooksMap[book.bookId] || []
+    }));
 
-                    const ENte = await pool.request()
-                        .input('bookID', sql.Int, item.bookID)
-                        .query(`
-                            SELECT NteRaw
-                            FROM ENte
-                            WHERE NteBibId = @bookID AND (NteTag = 505 OR NteTag = 500)
-                        `);
 
-                    const ECvr = await pool.request()
-                        .input('bookID', sql.Int, item.bookID)
-                        .query(`
-                            SELECT CvrFilename
-                            FROM ECvr
-                            WHERE CvrBibId = @bookID
-                        `);
+    const response = {
+      totalBooks: totalBooks,
+      items: formattedBooks
+    };
 
-                    const processedDetailBooks = detailBookResult.recordset.map(record => ({
-                        ...record,
-                        mainID: item.bookID,
-                        CallNumber: Ebib?.recordset[0]?.CalRaw ?? null,
-                        EntrDate: Ebib?.recordset[0]?.EntrDate ?? null,
-                        bookName: record?.EtcRaw ?? null,
-                        Book_Content: ENte?.recordset[0]?.NteRaw ?? null,
-                        ENte: ENte?.recordset[0]?.NteRaw ?? null,
-                        CvrFilename: ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
-                        EBInd: detail?.EBInd ?? null,
-                        EBTag: detail?.EBTag ?? null,
-                        EBEtcId: detail?.EBEtcId ?? null,
-                    }));
+    // Send formatted books as JSON response
+    res.json(response);
 
-                    await addJob(processedDetailBooks);
-                    return {
-                        bookID: item.bookID,
-                        detailBooks: processedDetailBooks,
-                    };
-                });
-
-                const detailBooksData = await Promise.all(dataloopin);
-                return detailBooksData;
-            });
-
-            const processedData = await Promise.all(datax);
-            const flattenedProcessedData = processedData.flat();
-            allResults = allResults.concat(flattenedProcessedData);
-        }
-
-        // Optionally, send allResults as a JSON response
-        res.json(allResults);
-
-  //  res.json(initialResult.recordset.length);
   } catch (error) {
-    console.error('Error fetching items:', error);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
+    console.error('Error fetching books:', error);
+    res.status(500).send('Internal Server Error');
+  } finally {
+    if (connection) connection.release();
   }
 });
 
-//เพิ่มยอดนิยม
-router.get('/AddTop', async (req, res) => {
+router.get('/getBooksByCollectionID', async (req, res) => {
+  let connection;
   try {
-    const pool = await poolPromise;
+    connection = await connectionMysql.getConnection();
 
-    //Query to fetch top 40 records grouped by ItemNo
-    const result = await pool.request().query(`
-      SELECT TOP 100 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
-      FROM CMCirculation CM
-      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
-      WHERE YEAR(CM.ChkODate) = 2024
-      GROUP BY CM.ItemNo, CI.ItemBib
-      ORDER BY TotalCount DESC
-    `);
+    const collectionID = req.query.collectionID;
+    console.log('collectionID', collectionID);
 
-    const [resultxx] = await connectionMysql.query(
-      `DELETE FROM TopBook 
-         WHERE BookId != 0 `
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
+    const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
+    const offset = (page - 1) * pageSize; // Offset calculation
+
+    // Fetch books by collectionID with pagination
+    const [books] = await connection.query(
+      'SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
+      [collectionID, pageSize, offset]
     );
 
-    const bookIDs = result.recordset.map(record => record.ItemBib);
-
-    await insertBooks(bookIDs);
-    // const result = await pool.request().query(`
-    //   SELECT TOP 100 ItemNo
-    //   FROM CMCirculation
-    //   WHERE YEAR(ChkODate) = 2024
-    // `);
-
-    if (result.recordset.length > 0) {
-      await addJobTop(result.recordset);
-    }
-
-    res.json(result.recordset);
-  } catch (error) {
-    console.error('Error fetching items:', error);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
-  }
-});
-
-//เพิ่มหนังสือแนะนำเข้าระบบ
-router.get('/Addrecomment', async (req, res) => {
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request().query(`SELECT * FROM EBibRec`);
-
-    const [resultxx] = await connectionMysql.query(
-      `DELETE FROM RecommentBook 
-         WHERE BookId != 0 `
+    const [results] = await connection.query(
+      'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
+      [collectionID]
     );
 
-    const bookIDs = result.recordset.map(record => record.BibId);
-  //  console.log('Addrecomment-->', bookIDs)
-    await insertBooks(bookIDs);
-    
-    await addJobrecomment(result.recordset);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error('Error fetching recommendations:', err);
+    const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
+
+    // Collect all bookIds for further queries
+    const bookIds = books.map(book => book.bookId);
+
+    // Fetch all related data in parallel
+    const [subjects] = await connection.query(
+      'SELECT * FROM subject WHERE bookId IN (?)',
+      [bookIds]
+    );
+
+    const [bookItems] = await connection.query(
+      'SELECT * FROM bookItem WHERE bookId IN (?)',
+      [bookIds]
+    );
+
+    const [pdfBooks] = await connection.query(
+      'SELECT pdfBook.*, typePdf.name AS typeName FROM pdfBook JOIN typePdf ON pdfBook.type = typePdf.id WHERE pdfBook.bookId IN (?)',
+      [bookIds]
+    );
+
+    // Map related data to their respective books
+    const subjectsMap = subjects.reduce((acc, subject) => {
+      if (!acc[subject.bookId]) acc[subject.bookId] = [];
+      acc[subject.bookId].push({
+        SubCnt: subject.SubCnt,
+        name: subject.name
+      });
+      return acc;
+    }, {});
+
+    const bookItemsMap = bookItems.reduce((acc, item) => {
+      if (!acc[item.bookId]) acc[item.bookId] = [];
+      acc[item.bookId].push({
+        ItemNo: item.ItemNo,
+        Cmponent: item.Cmponent,
+        callNumber: item.callNumber,
+        BookCategory: item.BookCategory
+      });
+      return acc;
+    }, {});
+
+    const pdfBooksMap = pdfBooks.reduce((acc, item) => {
+      if (!acc[item.bookId]) acc[item.bookId] = [];
+      acc[item.bookId].push({
+        pdfName: item.pdfName,
+        MmId: item.MmId,
+        urlPdf: item.urlPdf,
+        type: item.type,
+        typeName: item.typeName // Add typeName from typePdf
+      });
+      return acc;
+    }, {});
+
+    // Format books with related data
+    const formattedBooks = books.map(book => ({
+      ...book,
+      bookName: book.bookName,
+      subjects: subjectsMap[book.bookId] || [],
+      bookItem: bookItemsMap[book.bookId] || [],
+      bookPdf: pdfBooksMap[book.bookId] || []
+    }));
+
+    const response = {
+      totalBooks: totalBooks,
+      items: formattedBooks
+    };
+    // Send formatted books as JSON response
+    res.json(response);
+
+  } catch (error) {
+    console.error('Error fetching books by collectionID:', error);
     res.status(500).json({
       error: 'Internal Server Error'
     });
+  } finally {
+    if (connection) {
+      await connection.release();
+    }
   }
 });
 
-router.get('/getTopWeek', async (req, res) => {
+router.get('/getBooksByID', async (req, res) => {
+  let connection;
   try {
-    const pool = await poolPromise;
+    connection = await connectionMysql.getConnection();
+    const bookId = req.query.bookId;
+    console.log('bookId', bookId);
 
-    // Get the current date and the date of the previous week
-    const currentDate = new Date();
-    const lastWeekDate = new Date(currentDate);
-    lastWeekDate.setDate(currentDate.getDate() - 7);
+    // Fetch book by ID
+    const [books] = await connection.query('SELECT * FROM books WHERE bookId = ?', [bookId]);
 
-    // Format dates to match SQL Server's datetime format
-    const currentDateString = currentDate.toISOString().split('T')[0];
-    const lastWeekDateString = lastWeekDate.toISOString().split('T')[0];
-
-    // Query to fetch top 40 records grouped by ItemNo for the last week
-    const result = await pool.request().query(`
-      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
-      FROM CMCirculation CM
-      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
-      WHERE CM.ChkODate BETWEEN '${lastWeekDateString}' AND '${currentDateString}'
-      GROUP BY CM.ItemNo, CI.ItemBib
-      ORDER BY TotalCount DESC
-    `);
-
-    const bookIDs = result.recordset.map(record => record.ItemBib);
-    await insertBooks(bookIDs);
-    if (result.recordset.length > 0) {
-      await addJobTopW(result.recordset);
+    if (books.length === 0) {
+      return res.status(404).json({
+        error: 'Book not found'
+      });
     }
 
-    res.json(result.recordset);
+    const book = books[0];
+
+    // Initialize formatted book object
+    let formattedBook = {
+      ...book,
+      bookName: book.bookName,
+      subjects: [],
+      bookItem: [],
+      bookPdf: []
+    };
+
+    // Fetch subjects for the current book
+    const [subjects] = await connection.query('SELECT * FROM subject WHERE bookId = ?', [book.bookId]);
+    formattedBook.subjects = subjects.map(subject => ({
+      SubCnt: subject.SubCnt,
+      name: subject.name
+    }));
+
+    // Fetch book items for the current book including the image from books table
+    const [bookItems] = await connection.query(`
+        SELECT bookItem.*, books.image
+        FROM bookItem
+        JOIN books ON bookItem.bookId = books.bookId
+        WHERE bookItem.bookId = ?
+      `, [book.bookId]);
+    formattedBook.bookItem = bookItems.map(item => ({
+      ItemNo: item.ItemNo,
+      Cmponent: item.Cmponent,
+      callNumber: item.callNumber,
+      BookCategory: item.BookCategory,
+      image: item.image, // Add image to the bookItem
+      status: 'avaliable'
+    }));
+
+    // Fetch pdfBooks for the current book
+    const [pdfBooks] = await connection.query('SELECT pdfBook.*, typePdf.name AS typeName FROM pdfBook JOIN typePdf ON pdfBook.type = typePdf.id WHERE pdfBook.bookId = ?', [book.bookId]);
+    formattedBook.bookPdf = pdfBooks.map(item => ({
+      pdfName: item.pdfName,
+      MmId: item.MmId,
+      urlPdf: item.urlPdf,
+      type: item.type,
+      typeName: item.typeName // Add typeName from typePdf
+    }));
+
+    // Send formatted book as JSON response
+    res.json(formattedBook);
   } catch (error) {
-    console.error('Error fetching items:', error);
+    console.error('Error fetching books by ID:', error);
     res.status(500).json({
       error: 'Internal Server Error'
     });
-  }
-});
-
-router.get('/getTopMonth', async (req, res) => {
-  try {
-    const pool = await poolPromise;
-
-    // Get the current date
-    const currentDate = new Date();
-    
-    // Calculate the start and end dates of the last month
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-
-    // Format dates to match SQL Server's datetime format
-    const startOfMonthString = startOfMonth.toISOString().split('T')[0];
-    const endOfMonthString = endOfMonth.toISOString().split('T')[0];
-
-    // Query to fetch top 40 records grouped by ItemNo for the last month
-    const result = await pool.request().query(`
-      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
-      FROM CMCirculation CM
-      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
-      WHERE CM.ChkODate BETWEEN '${startOfMonthString}' AND '${endOfMonthString}'
-      GROUP BY CM.ItemNo, CI.ItemBib
-      ORDER BY TotalCount DESC
-    `);
-
-    const bookIDs = result.recordset.map(record => record.ItemBib);
-    await insertBooks(bookIDs);
-    if (result.recordset.length > 0) {
-      await addJobTopWM(result.recordset);
+  } finally {
+    if (connection) {
+      await connection.release();
     }
-
-    res.json(result.recordset);
-  } catch (error) {
-    console.error('Error fetching items:', error);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
   }
 });
 
@@ -2085,6 +2093,287 @@ router.get('/add_dataBookslist29', async (req, res) => {
 });
 
 
+//เพิ่มหนังสือมาใหม่ // ECvr
+router.get('/AddNewbooks', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    // Query to fetch top 40 records grouped by ItemNo
+    const maxNum = 100;
+        let allResults = [];
+
+        for (let startNum = 0; startNum <= maxNum; startNum++) {
+            const { page = 1, pageSize = 10 } = req.query;
+
+            // First SQL Server query to get book IDs with pagination
+            const result = await pool.request()
+                .input('pageSize', sql.Int, pageSize)
+                .input('offset', sql.Int, startNum * pageSize)
+                .query(`
+                    WITH Pagination AS (
+                        SELECT EBib.BibId as bookId, ROW_NUMBER() OVER (ORDER BY EBib.BibId DESC) AS RowNum
+                        FROM EBib
+                        INNER JOIN ECvr ON EBib.BibId = ECvr.CvrBibId
+                    )
+                    SELECT bookId
+                    FROM Pagination
+                    WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
+                `);
+
+            const bookIDs = result.recordset.map(row => row.bookId);
+
+            if (bookIDs.length === 0) {
+                continue;
+            }
+
+            // MySQL deletion
+            const deleteResult = await connectionMysql.query(
+                `DELETE FROM CollectionBookId WHERE BookId IN (?)`, [bookIDs]
+            );
+
+            console.log('Deleted Book IDs from MySQL:', deleteResult);
+
+            // Fetch details for each book ID
+            const detailBooksPromises = bookIDs.map(async bookID => {
+                const detailBookResult = await pool.request()
+                    .input('bookID', sql.Int, bookID)
+                    .query(`
+                        SELECT EBEtcId, EBInd, EBTag
+                        FROM EEtcBib
+                        WHERE EBBibId = @bookID
+                    `);
+                return detailBookResult.recordset;
+            });
+
+            const detailBooks = await Promise.all(detailBooksPromises);
+
+            const combinedResults = bookIDs.map((bookID, index) => ({
+                bookID,
+                detailBooks: detailBooks[index]
+            }));
+
+            const datax = combinedResults.map(async item => {
+                const dataloopin = item.detailBooks.map(async detail => {
+                    const detailBookResult = await pool.request()
+                        .input('EtcId', detail.EBEtcId)
+                        .query(`
+                            SELECT *
+                            FROM EEtc
+                            WHERE EtcId = @EtcId
+                        `);
+
+                    const Ebib = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT CalRaw, EntrDate
+                            FROM EBib
+                            WHERE BibId = @bookID
+                        `);
+
+                    const ENte = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT NteRaw
+                            FROM ENte
+                            WHERE NteBibId = @bookID AND (NteTag = 505 OR NteTag = 500)
+                        `);
+
+                    const ECvr = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT CvrFilename
+                            FROM ECvr
+                            WHERE CvrBibId = @bookID
+                        `);
+
+                    const processedDetailBooks = detailBookResult.recordset.map(record => ({
+                        ...record,
+                        mainID: item.bookID,
+                        CallNumber: Ebib?.recordset[0]?.CalRaw ?? null,
+                        EntrDate: Ebib?.recordset[0]?.EntrDate ?? null,
+                        bookName: record?.EtcRaw ?? null,
+                        Book_Content: ENte?.recordset[0]?.NteRaw ?? null,
+                        ENte: ENte?.recordset[0]?.NteRaw ?? null,
+                        CvrFilename: ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
+                        EBInd: detail?.EBInd ?? null,
+                        EBTag: detail?.EBTag ?? null,
+                        EBEtcId: detail?.EBEtcId ?? null,
+                    }));
+
+                    await addJob(processedDetailBooks);
+                    return {
+                        bookID: item.bookID,
+                        detailBooks: processedDetailBooks,
+                    };
+                });
+
+                const detailBooksData = await Promise.all(dataloopin);
+                return detailBooksData;
+            });
+
+            const processedData = await Promise.all(datax);
+            const flattenedProcessedData = processedData.flat();
+            allResults = allResults.concat(flattenedProcessedData);
+        }
+
+        // Optionally, send allResults as a JSON response
+        res.json(allResults);
+
+  //  res.json(initialResult.recordset.length);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มยอดนิยม
+router.get('/AddTop', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    //Query to fetch top 40 records grouped by ItemNo
+    const result = await pool.request().query(`
+      SELECT TOP 100 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      FROM CMCirculation CM
+      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
+      WHERE YEAR(CM.ChkODate) = 2024
+      GROUP BY CM.ItemNo, CI.ItemBib
+      ORDER BY TotalCount DESC
+    `);
+
+    const [resultxx] = await connectionMysql.query(
+      `DELETE FROM TopBook 
+         WHERE BookId != 0 `
+    );
+
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+
+    await insertBooks(bookIDs);
+    // const result = await pool.request().query(`
+    //   SELECT TOP 100 ItemNo
+    //   FROM CMCirculation
+    //   WHERE YEAR(ChkODate) = 2024
+    // `);
+
+    if (result.recordset.length > 0) {
+      await addJobTop(result.recordset);
+    }
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มหนังสือแนะนำเข้าระบบ
+router.get('/Addrecomment', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`SELECT * FROM EBibRec`);
+
+    const [resultxx] = await connectionMysql.query(
+      `DELETE FROM RecommentBook 
+         WHERE BookId != 0 `
+    );
+
+    const bookIDs = result.recordset.map(record => record.BibId);
+  //  console.log('Addrecomment-->', bookIDs)
+    await insertBooks(bookIDs);
+    
+    await addJobrecomment(result.recordset);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Error fetching recommendations:', err);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มยอดนิยมสัปดาห์
+router.get('/getTopWeek', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    // Get the current date and the date of the previous week
+    const currentDate = new Date();
+    const lastWeekDate = new Date(currentDate);
+    lastWeekDate.setDate(currentDate.getDate() - 7);
+
+    // Format dates to match SQL Server's datetime format
+    const currentDateString = currentDate.toISOString().split('T')[0];
+    const lastWeekDateString = lastWeekDate.toISOString().split('T')[0];
+
+    // Query to fetch top 40 records grouped by ItemNo for the last week
+    const result = await pool.request().query(`
+      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      FROM CMCirculation CM
+      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
+      WHERE CM.ChkODate BETWEEN '${lastWeekDateString}' AND '${currentDateString}'
+      GROUP BY CM.ItemNo, CI.ItemBib
+      ORDER BY TotalCount DESC
+    `);
+
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+    await insertBooks(bookIDs);
+    if (result.recordset.length > 0) {
+      await addJobTopW(result.recordset);
+    }
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มยอดนิยมรายเดือน
+router.get('/getTopMonth', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    // Get the current date
+    const currentDate = new Date();
+    
+    // Calculate the start and end dates of the last month
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+
+    // Format dates to match SQL Server's datetime format
+    const startOfMonthString = startOfMonth.toISOString().split('T')[0];
+    const endOfMonthString = endOfMonth.toISOString().split('T')[0];
+
+    // Query to fetch top 40 records grouped by ItemNo for the last month
+    const result = await pool.request().query(`
+      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      FROM CMCirculation CM
+      JOIN CItem CI ON CM.ItemNo = CI.ItemNo
+      WHERE CM.ChkODate BETWEEN '${startOfMonthString}' AND '${endOfMonthString}'
+      GROUP BY CM.ItemNo, CI.ItemBib
+      ORDER BY TotalCount DESC
+    `);
+
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+    await insertBooks(bookIDs);
+    if (result.recordset.length > 0) {
+      await addJobTopWM(result.recordset);
+    }
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
 
 router.get('/add_dataBookslist99', async (req, res) => {
   try {
@@ -2135,297 +2424,6 @@ function formatImageName(imageName) {
   // Combine the formatted part with the file extension
   return formattedPart;
 }
-
-//http://localhost:3000/getBooks?page=1&pageSize=10
-router.get('/getBooks', async (req, res) => {
-  let connection;
-  try {
-    connection = await connectionMysql.getConnection();
-
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
-    const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
-    const offset = (page - 1) * pageSize; // Offset calculation
-
-    // Fetch books with pagination
-    const [books] = await connection.query(`
-      SELECT *
-      FROM books
-      ORDER BY bookId DESC
-      LIMIT ? OFFSET ?
-    `, [pageSize, offset]);
-
-    // Fetch all subjects, bookItems, and pdfBooks in parallel
-    const bookIds = books.map(book => book.bookId);
-
-    const [subjects] = await connection.query(`
-      SELECT *
-      FROM subject
-      WHERE bookId IN (?)
-    `, [bookIds]);
-
-    const [bookItems] = await connection.query(`
-      SELECT *
-      FROM bookItem
-      WHERE bookId IN (?)
-    `, [bookIds]);
-
-    const [pdfBooks] = await connection.query(`
-      SELECT pdfBook.*, typePdf.name AS typeName
-      FROM pdfBook
-      JOIN typePdf ON pdfBook.type = typePdf.id
-      WHERE pdfBook.bookId IN (?)
-    `, [bookIds]);
-
-    const [results] = await connection.query(`
-      SELECT *, (SELECT COUNT(*) FROM books) as totalBooks
-      FROM books
-      ORDER BY bookId DESC
-    `);
-
-    const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
-
-    // Create a map for quick lookup
-    const subjectsMap = subjects.reduce((acc, subject) => {
-      if (!acc[subject.bookId]) acc[subject.bookId] = [];
-      acc[subject.bookId].push({
-        SubCnt: subject.SubCnt,
-        name: subject.name
-      });
-      return acc;
-    }, {});
-
-    const bookItemsMap = bookItems.reduce((acc, item) => {
-      if (!acc[item.bookId]) acc[item.bookId] = [];
-      acc[item.bookId].push({
-        ItemNo: item.ItemNo,
-        Cmponent: item.Cmponent,
-        callNumber: item.callNumber,
-        BookCategory: item.BookCategory
-      });
-      return acc;
-    }, {});
-
-    const pdfBooksMap = pdfBooks.reduce((acc, item) => {
-      if (!acc[item.bookId]) acc[item.bookId] = [];
-      acc[item.bookId].push({
-        pdfName: item.pdfName,
-        MmId: item.MmId,
-        urlPdf: item.urlPdf,
-        type: item.type,
-        typeName: item.typeName
-      });
-      return acc;
-    }, {});
-
-    // Format books with related data
-    const formattedBooks = books.map(book => ({
-      ...book,
-      bookName: book.bookName,
-      subjects: subjectsMap[book.bookId] || [],
-      bookItem: bookItemsMap[book.bookId] || [],
-      bookPdf: pdfBooksMap[book.bookId] || []
-    }));
-
-
-    const response = {
-      totalBooks: totalBooks,
-      items: formattedBooks
-    };
-
-    // Send formatted books as JSON response
-    res.json(response);
-
-  } catch (error) {
-    console.error('Error fetching books:', error);
-    res.status(500).send('Internal Server Error');
-  } finally {
-    if (connection) connection.release();
-  }
-});
-
-
-router.get('/getBooksByCollectionID', async (req, res) => {
-  let connection;
-  try {
-    connection = await connectionMysql.getConnection();
-
-    const collectionID = req.query.collectionID;
-    console.log('collectionID', collectionID);
-
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1; // Current page number (default: 1)
-    const pageSize = parseInt(req.query.pageSize) || 10; // Number of items per page (default: 10)
-    const offset = (page - 1) * pageSize; // Offset calculation
-
-    // Fetch books by collectionID with pagination
-    const [books] = await connection.query(
-      'SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
-      [collectionID, pageSize, offset]
-    );
-
-    const [results] = await connection.query(
-      'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
-      [collectionID]
-    );
-
-    const totalBooks = results.length > 0 ? results[0].totalBooks : 0;
-
-    // Collect all bookIds for further queries
-    const bookIds = books.map(book => book.bookId);
-
-    // Fetch all related data in parallel
-    const [subjects] = await connection.query(
-      'SELECT * FROM subject WHERE bookId IN (?)',
-      [bookIds]
-    );
-
-    const [bookItems] = await connection.query(
-      'SELECT * FROM bookItem WHERE bookId IN (?)',
-      [bookIds]
-    );
-
-    const [pdfBooks] = await connection.query(
-      'SELECT pdfBook.*, typePdf.name AS typeName FROM pdfBook JOIN typePdf ON pdfBook.type = typePdf.id WHERE pdfBook.bookId IN (?)',
-      [bookIds]
-    );
-
-    // Map related data to their respective books
-    const subjectsMap = subjects.reduce((acc, subject) => {
-      if (!acc[subject.bookId]) acc[subject.bookId] = [];
-      acc[subject.bookId].push({
-        SubCnt: subject.SubCnt,
-        name: subject.name
-      });
-      return acc;
-    }, {});
-
-    const bookItemsMap = bookItems.reduce((acc, item) => {
-      if (!acc[item.bookId]) acc[item.bookId] = [];
-      acc[item.bookId].push({
-        ItemNo: item.ItemNo,
-        Cmponent: item.Cmponent,
-        callNumber: item.callNumber,
-        BookCategory: item.BookCategory
-      });
-      return acc;
-    }, {});
-
-    const pdfBooksMap = pdfBooks.reduce((acc, item) => {
-      if (!acc[item.bookId]) acc[item.bookId] = [];
-      acc[item.bookId].push({
-        pdfName: item.pdfName,
-        MmId: item.MmId,
-        urlPdf: item.urlPdf,
-        type: item.type,
-        typeName: item.typeName // Add typeName from typePdf
-      });
-      return acc;
-    }, {});
-
-    // Format books with related data
-    const formattedBooks = books.map(book => ({
-      ...book,
-      bookName: book.bookName,
-      subjects: subjectsMap[book.bookId] || [],
-      bookItem: bookItemsMap[book.bookId] || [],
-      bookPdf: pdfBooksMap[book.bookId] || []
-    }));
-
-    const response = {
-      totalBooks: totalBooks,
-      items: formattedBooks
-    };
-    // Send formatted books as JSON response
-    res.json(response);
-
-  } catch (error) {
-    console.error('Error fetching books by collectionID:', error);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
-  } finally {
-    if (connection) {
-      await connection.release();
-    }
-  }
-});
-
-
-
-router.get('/getBooksByID', async (req, res) => {
-  let connection;
-  try {
-    connection = await connectionMysql.getConnection();
-    const bookId = req.query.bookId;
-    console.log('bookId', bookId);
-
-    // Fetch book by ID
-    const [books] = await connection.query('SELECT * FROM books WHERE bookId = ?', [bookId]);
-
-    if (books.length === 0) {
-      return res.status(404).json({
-        error: 'Book not found'
-      });
-    }
-
-    const book = books[0];
-
-    // Initialize formatted book object
-    let formattedBook = {
-      ...book,
-      bookName: book.bookName,
-      subjects: [],
-      bookItem: [],
-      bookPdf: []
-    };
-
-    // Fetch subjects for the current book
-    const [subjects] = await connection.query('SELECT * FROM subject WHERE bookId = ?', [book.bookId]);
-    formattedBook.subjects = subjects.map(subject => ({
-      SubCnt: subject.SubCnt,
-      name: subject.name
-    }));
-
-    // Fetch book items for the current book including the image from books table
-    const [bookItems] = await connection.query(`
-        SELECT bookItem.*, books.image
-        FROM bookItem
-        JOIN books ON bookItem.bookId = books.bookId
-        WHERE bookItem.bookId = ?
-      `, [book.bookId]);
-    formattedBook.bookItem = bookItems.map(item => ({
-      ItemNo: item.ItemNo,
-      Cmponent: item.Cmponent,
-      callNumber: item.callNumber,
-      BookCategory: item.BookCategory,
-      image: item.image, // Add image to the bookItem
-      status: 'avaliable'
-    }));
-
-    // Fetch pdfBooks for the current book
-    const [pdfBooks] = await connection.query('SELECT pdfBook.*, typePdf.name AS typeName FROM pdfBook JOIN typePdf ON pdfBook.type = typePdf.id WHERE pdfBook.bookId = ?', [book.bookId]);
-    formattedBook.bookPdf = pdfBooks.map(item => ({
-      pdfName: item.pdfName,
-      MmId: item.MmId,
-      urlPdf: item.urlPdf,
-      type: item.type,
-      typeName: item.typeName // Add typeName from typePdf
-    }));
-
-    // Send formatted book as JSON response
-    res.json(formattedBook);
-  } catch (error) {
-    console.error('Error fetching books by ID:', error);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
-  } finally {
-    if (connection) {
-      await connection.release();
-    }
-  }
-});
 
 router.get('/kpibook-placeholder', async (req, res) => {
   const imagePath = path.join(__dirname, 'public/assets/image/kpibook-placeholder.jpg');
