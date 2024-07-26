@@ -133,7 +133,6 @@ const worker = new Worker('jobQueue', async (job) => {
 
   if (job.name === 'Recomment') {
     // Process the job
-    console.log('Processing Recomment job xx:', job.data);
     for (const item of job.data) {
       await updateRecommentBook(item);
     }
@@ -196,7 +195,7 @@ const worker = new Worker('jobQueue', async (job) => {
 
     }
 
-    if(item.EBInd == 0 && item.EBTag == 100){
+    if(item.EBTag == 100){
       if (existingRecord) {
         console.log('updateAuthor');
         await updateAuthor(item);

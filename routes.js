@@ -11,7 +11,7 @@ const {
   addJobrecomment,
   addJobTop,
   addJobTopW,
-  addJobTopM,
+  addJobTopWM,
 } = require('./jobHandlers');
 
 const path = require('path');
@@ -107,20 +107,159 @@ router.get('/data', async (req, res) => {
   }
 });
 
-router.get('/Addrecomment', async (req, res) => {
+// http://localhost:3000/dataBookOne?bookId=31515
+router.get('/dataBookOne', async (req, res) => {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query(`SELECT * FROM EBibRec`);
-    await addJobrecomment(result.recordset);
-    res.json(result.recordset);
+    const bookId = parseInt(req.query.bookId);
+    let allResults = [];
+
+      const result = await pool.request()
+        .input('bookId', sql.Int, bookId)
+        .query(`
+          WITH PaginatedData AS (
+            SELECT
+              EBib.BibId AS mainID,
+              EBib.EntrDate AS EntrDate,
+              EBib.CalRaw AS CallNumber,
+              EEtc.EtcRaw AS bookName,
+              EEtcBib.EBTag AS EBTag,
+              EEtcBib.EBInd AS EBInd,
+              EEtc.EtcCnt as EtcCnt,
+              EEtcBib.EBEtcId as EBEtcId,
+              ENte.NteRaw AS Book_Content,
+              ECvr.CvrFilename AS CvrFilename,
+              ROW_NUMBER() OVER (ORDER BY EBib.EntrDate DESC) AS RowNum
+            FROM EBib
+            JOIN EEtcBib ON EBib.BibId = EEtcBib.EBBibId
+            JOIN EEtc ON EEtcBib.EBEtcId = EEtc.EtcId
+            JOIN ENte ON EEtcBib.EBBibId = ENte.NteBibId
+            JOIN ECvr ON EEtcBib.EBBibId = ECvr.CvrBibId
+            WHERE ENte.NteTag = 505 OR ENte.NteTag = 500
+          )
+          SELECT mainID, CallNumber, bookName, EBTag, EBInd, Book_Content, CvrFilename, EtcCnt, EBEtcId, EntrDate
+          FROM PaginatedData
+          WHERE mainID = @bookId;
+        `);
+
+      if (result.recordset.length > 0) {
+        allResults = allResults.concat(result.recordset);
+        await addJob(result.recordset);
+      }
+    
+    res.json(allResults);
   } catch (err) {
-    console.error('Error fetching recommendations:', err);
-    res.status(500).json({
-      error: 'Internal Server Error'
-    });
+    console.error('Error executing query:', err);
+    res.status(500).send('Error retrieving data');
   }
 });
 
+// http://localhost:3000/dataBookOne?bookId=31515 vs
+router.get('/dataBookOne2', async (req, res) => {
+  try {
+
+    const pool = await poolPromise;
+    const bookId = parseInt(req.query.bookId);
+
+    await insertBooks([bookId]);
+
+  //  await insertBooks(bookIDs);
+
+  } catch (err) {
+    console.error('Error executing query:', err);
+    res.status(500).send('Error retrieving data');
+  }
+});
+
+
+const insertBooks = async (bookIDs) => {
+  const pool = await poolPromise;
+  console.log('bookIDs==>>>', bookIDs);
+  const detailBooksPromises = bookIDs.map(async (bookID) => {
+    const detailBookResult = await pool.request()
+      .input('EBBibId', bookID)
+      .query(`
+        SELECT EBEtcId, EBInd, EBTag
+        FROM EEtcBib
+        WHERE EBBibId = @EBBibId;
+      `);
+    return {
+      bookID,
+      details: detailBookResult.recordset
+    };
+  });
+
+  const detailBooks = await Promise.all(detailBooksPromises);
+
+  console.log('insertBooks==>>>', detailBooks);
+
+  const datax = detailBooks.map(async (item) => {
+    const dataloopin = item.details.map(async (detail) => {
+      const detailBookResult = await pool.request()
+        .input('EtcId', detail.EBEtcId)
+        .query(`
+          SELECT *
+          FROM EEtc
+          WHERE EtcId = @EtcId;
+        `);
+
+      const Ebib = await pool.request()
+        .input('bookID', item.bookID)
+        .query(`
+          SELECT CalRaw, EntrDate
+          FROM EBib
+          WHERE BibId = @bookID;
+        `);
+
+      const ENte = await pool.request()
+        .input('bookID', item.bookID)
+        .query(`
+          SELECT NteRaw
+          FROM ENte
+          WHERE NteBibId = @bookID AND (ENte.NteTag = 505 OR ENte.NteTag = 500); 
+        `);
+
+      const ECvr = await pool.request()
+        .input('bookID', item.bookID)
+        .query(`
+          SELECT CvrFilename
+          FROM ECvr
+          WHERE CvrBibId = @bookID;
+        `);
+
+      const processedDetailBooks = detailBookResult.recordset.map(record => ({
+        ...record,
+        "mainID": item.bookID,
+        "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
+        "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
+        "bookName": record?.EtcRaw ?? null,
+        "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
+        "ENte": ENte?.recordset[0]?.NteRaw ?? null,
+        "CvrFilename": ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
+        "EBInd": detail?.EBInd ?? null,
+        "EBTag": detail?.EBTag ?? null,
+        "EBEtcId": detail?.EBEtcId ?? null,
+      }));
+
+      console.log('ECvr==>>>', item.bookID);
+      await addJob(processedDetailBooks);
+      return {
+        bookID: item.bookID,
+        detailBooks: processedDetailBooks,
+      };
+    });
+
+    const detailBooksData = await Promise.all(dataloopin);
+    return detailBooksData;
+  });
+
+  const processedData = await Promise.all(datax);
+  const flattenedProcessedData = processedData.flat();
+
+  console.log('Processed Data:', flattenedProcessedData);
+};
+
+/////////////////////////////////////////////////////////////////
 
 router.get('/getNewBooks', async (req, res) => {
   let connection;
@@ -135,7 +274,7 @@ router.get('/getNewBooks', async (req, res) => {
     // Fetch books with pagination
     const [result] = await connection.query(
       `SELECT * FROM books 
-         WHERE image IS NOT NULL AND image != '' 
+         WHERE image IS NOT NULL AND image != 'https://kpilib-api.ideavivat.com/kpibook-placeholder' 
          ORDER BY EntrDate DESC 
          LIMIT ? OFFSET ?`,
       [parseInt(pageSize), parseInt(offset)]
@@ -157,7 +296,6 @@ router.get('/getNewBooks', async (req, res) => {
   }
 });
 
-
 router.get('/getRecommentBooks', async (req, res) => {
   let connection;
   try {
@@ -168,11 +306,11 @@ router.get('/getRecommentBooks', async (req, res) => {
 
     // Query to fetch recommended books based on relationships with RecommentBook.bookId
     const [result] = await connection.query(`
-        SELECT DISTINCT b.*
-        FROM books b
-        INNER JOIN RecommentBook rb ON b.bookId = rb.bookId
-        ORDER BY b.EntrDate DESC
-        LIMIT ? OFFSET ?
+        SELECT b.*
+      FROM books b
+      INNER JOIN RecommentBook rb ON b.bookId = rb.bookId
+      ORDER BY rb.sortby ASC
+      LIMIT ? OFFSET ?
       `, [pageSize, offset]);
 
 
@@ -212,10 +350,10 @@ router.get('/getTopBooks', async (req, res) => {
 
     // Query to fetch recommended books based on relationships with RecommentBook.bookId
     const [result] = await connection.query(`
-        SELECT DISTINCT b.*
+        SELECT DISTINCT b.*, rb.TotalCount
         FROM books b
         INNER JOIN TopBook rb ON b.bookId = rb.bookId
-        ORDER BY b.EntrDate DESC
+        ORDER BY rb.TotalCount DESC
         LIMIT ? OFFSET ?
       `, [pageSize, offset]);
 
@@ -331,7 +469,6 @@ router.get('/getTopBooksMonth', async (req, res) => {
   }
 });
 
-
 router.get('/getCollection', async (req, res) => {
 
   let connection;
@@ -365,20 +502,169 @@ router.get('/getCollection', async (req, res) => {
 
 });
 
-
-router.get('/getTop', async (req, res) => {
+//เพิ่มหนังสือมาใหม่ // ECvr
+router.get('/AddNewbooks', async (req, res) => {
   try {
     const pool = await poolPromise;
 
     // Query to fetch top 40 records grouped by ItemNo
+    const maxNum = 100;
+        let allResults = [];
+
+        for (let startNum = 0; startNum <= maxNum; startNum++) {
+            const { page = 1, pageSize = 10 } = req.query;
+
+            // First SQL Server query to get book IDs with pagination
+            const result = await pool.request()
+                .input('pageSize', sql.Int, pageSize)
+                .input('offset', sql.Int, startNum * pageSize)
+                .query(`
+                    WITH Pagination AS (
+                        SELECT EBib.BibId as bookId, ROW_NUMBER() OVER (ORDER BY EBib.BibId DESC) AS RowNum
+                        FROM EBib
+                        INNER JOIN ECvr ON EBib.BibId = ECvr.CvrBibId
+                    )
+                    SELECT bookId
+                    FROM Pagination
+                    WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
+                `);
+
+            const bookIDs = result.recordset.map(row => row.bookId);
+
+            if (bookIDs.length === 0) {
+                continue;
+            }
+
+            // MySQL deletion
+            const deleteResult = await connectionMysql.query(
+                `DELETE FROM CollectionBookId WHERE BookId IN (?)`, [bookIDs]
+            );
+
+            console.log('Deleted Book IDs from MySQL:', deleteResult);
+
+            // Fetch details for each book ID
+            const detailBooksPromises = bookIDs.map(async bookID => {
+                const detailBookResult = await pool.request()
+                    .input('bookID', sql.Int, bookID)
+                    .query(`
+                        SELECT EBEtcId, EBInd, EBTag
+                        FROM EEtcBib
+                        WHERE EBBibId = @bookID
+                    `);
+                return detailBookResult.recordset;
+            });
+
+            const detailBooks = await Promise.all(detailBooksPromises);
+
+            const combinedResults = bookIDs.map((bookID, index) => ({
+                bookID,
+                detailBooks: detailBooks[index]
+            }));
+
+            const datax = combinedResults.map(async item => {
+                const dataloopin = item.detailBooks.map(async detail => {
+                    const detailBookResult = await pool.request()
+                        .input('EtcId', detail.EBEtcId)
+                        .query(`
+                            SELECT *
+                            FROM EEtc
+                            WHERE EtcId = @EtcId
+                        `);
+
+                    const Ebib = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT CalRaw, EntrDate
+                            FROM EBib
+                            WHERE BibId = @bookID
+                        `);
+
+                    const ENte = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT NteRaw
+                            FROM ENte
+                            WHERE NteBibId = @bookID AND (NteTag = 505 OR NteTag = 500)
+                        `);
+
+                    const ECvr = await pool.request()
+                        .input('bookID', sql.Int, item.bookID)
+                        .query(`
+                            SELECT CvrFilename
+                            FROM ECvr
+                            WHERE CvrBibId = @bookID
+                        `);
+
+                    const processedDetailBooks = detailBookResult.recordset.map(record => ({
+                        ...record,
+                        mainID: item.bookID,
+                        CallNumber: Ebib?.recordset[0]?.CalRaw ?? null,
+                        EntrDate: Ebib?.recordset[0]?.EntrDate ?? null,
+                        bookName: record?.EtcRaw ?? null,
+                        Book_Content: ENte?.recordset[0]?.NteRaw ?? null,
+                        ENte: ENte?.recordset[0]?.NteRaw ?? null,
+                        CvrFilename: ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
+                        EBInd: detail?.EBInd ?? null,
+                        EBTag: detail?.EBTag ?? null,
+                        EBEtcId: detail?.EBEtcId ?? null,
+                    }));
+
+                    await addJob(processedDetailBooks);
+                    return {
+                        bookID: item.bookID,
+                        detailBooks: processedDetailBooks,
+                    };
+                });
+
+                const detailBooksData = await Promise.all(dataloopin);
+                return detailBooksData;
+            });
+
+            const processedData = await Promise.all(datax);
+            const flattenedProcessedData = processedData.flat();
+            allResults = allResults.concat(flattenedProcessedData);
+        }
+
+        // Optionally, send allResults as a JSON response
+        res.json(allResults);
+
+  //  res.json(initialResult.recordset.length);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มยอดนิยม
+router.get('/AddTop', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+
+    //Query to fetch top 40 records grouped by ItemNo
     const result = await pool.request().query(`
-      SELECT TOP 40 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
+      SELECT TOP 100 CM.ItemNo, COUNT(*) AS TotalCount, CI.ItemBib
       FROM CMCirculation CM
       JOIN CItem CI ON CM.ItemNo = CI.ItemNo
       WHERE YEAR(CM.ChkODate) = 2024
       GROUP BY CM.ItemNo, CI.ItemBib
       ORDER BY TotalCount DESC
     `);
+
+    const [resultxx] = await connectionMysql.query(
+      `DELETE FROM TopBook 
+         WHERE BookId != 0 `
+    );
+
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+
+    await insertBooks(bookIDs);
+    // const result = await pool.request().query(`
+    //   SELECT TOP 100 ItemNo
+    //   FROM CMCirculation
+    //   WHERE YEAR(ChkODate) = 2024
+    // `);
 
     if (result.recordset.length > 0) {
       await addJobTop(result.recordset);
@@ -387,6 +673,31 @@ router.get('/getTop', async (req, res) => {
     res.json(result.recordset);
   } catch (error) {
     console.error('Error fetching items:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+//เพิ่มหนังสือแนะนำเข้าระบบ
+router.get('/Addrecomment', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`SELECT * FROM EBibRec`);
+
+    const [resultxx] = await connectionMysql.query(
+      `DELETE FROM RecommentBook 
+         WHERE BookId != 0 `
+    );
+
+    const bookIDs = result.recordset.map(record => record.BibId);
+  //  console.log('Addrecomment-->', bookIDs)
+    await insertBooks(bookIDs);
+    
+    await addJobrecomment(result.recordset);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Error fetching recommendations:', err);
     res.status(500).json({
       error: 'Internal Server Error'
     });
@@ -416,6 +727,8 @@ router.get('/getTopWeek', async (req, res) => {
       ORDER BY TotalCount DESC
     `);
 
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+    await insertBooks(bookIDs);
     if (result.recordset.length > 0) {
       await addJobTopW(result.recordset);
     }
@@ -428,7 +741,6 @@ router.get('/getTopWeek', async (req, res) => {
     });
   }
 });
-
 
 router.get('/getTopMonth', async (req, res) => {
   try {
@@ -455,6 +767,8 @@ router.get('/getTopMonth', async (req, res) => {
       ORDER BY TotalCount DESC
     `);
 
+    const bookIDs = result.recordset.map(record => record.ItemBib);
+    await insertBooks(bookIDs);
     if (result.recordset.length > 0) {
       await addJobTopWM(result.recordset);
     }
