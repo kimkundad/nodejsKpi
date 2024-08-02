@@ -195,6 +195,7 @@ const insertBooks = async (bookIDs) => {
 
   const datax = detailBooks.map(async (item) => {
     const dataloopin = item.details.map(async (detail) => {
+
       const detailBookResult = await pool.request()
         .input('EtcId', detail.EBEtcId)
         .query(`
@@ -233,6 +234,7 @@ const insertBooks = async (bookIDs) => {
         "CallNumber": Ebib?.recordset[0]?.CalRaw ?? null,
         "EntrDate": Ebib?.recordset[0]?.EntrDate ?? null,
         "bookName": record?.EtcRaw ?? null,
+        "EtcId": detail.EBEtcId ?? null,
         "Book_Content": ENte?.recordset[0]?.NteRaw ?? null,
         "ENte": ENte?.recordset[0]?.NteRaw ?? null,
         "CvrFilename": ECvr?.recordset[0]?.CvrFilename ? formatImageName(ECvr.recordset[0].CvrFilename) : "https://kpilib-api.ideavivat.com/kpibook-placeholder",
@@ -747,7 +749,8 @@ router.get('/getBooksByID', async (req, res) => {
     const [subjects] = await connection.query('SELECT * FROM subject WHERE bookId = ?', [book.bookId]);
     formattedBook.subjects = subjects.map(subject => ({
       SubCnt: subject.SubCnt,
-      name: subject.name
+      name: subject.name,
+      EtcId: subject.EtcId
     }));
 
     // Fetch book items for the current book including the image from books table

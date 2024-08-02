@@ -147,7 +147,7 @@ const worker = new Worker('jobQueue', async (job) => {
   const modifiedData = job.data.map(item => ({
     ...item,
   CallNumber: item.CallNumber ? item.CallNumber.replace(/\\[abc]/g, '') : null,
-  bookName: item.bookName ? item.bookName.replace(/\\[abdcxz]/g, '') : null,
+  bookName: item.bookName ? item.bookName.replace(/\\[abdcxyz]/g, '') : null,
   Book_Content: item.Book_Content ? item.Book_Content.replace(/\\[abc]/g, '') : null,
   CvrFilename: item.CvrFilename,
   EBInd: item.EBInd ? item.EBInd.trim() : null
@@ -254,7 +254,7 @@ const worker = new Worker('jobQueue', async (job) => {
       }
     }
 
-    if(item.EBInd == 4 && item.EBTag == 650){
+    if( (item.EBInd == 4 && item.EBTag == 650) || (item.EBInd == 4 && item.EBTag == 651) ){
       console.log('updateSubject');
       await updateSubject(item);
     }
@@ -1026,23 +1026,31 @@ const updateSubject = async (item) => {
     connection1 = await connectionMysql.getConnection();
     await connection1.beginTransaction();
     
-    const { mainID, EtcCnt, bookName } = item;
+    const { mainID, EtcCnt, bookName, EBEtcId } = item;
     const createdAt = new Date(); // Current timestamp for createdAt
     const updatedAt = new Date(); // Current timestamp for updatedAt
-    
+
+    const strReplace = bookName.replace(/ {1,2}/g, ' -- ');
+
+    let EUrl = null;
+
+    if(EtcCnt > 1){
+      EUrl = `https://www.kpi-lib.com/elib/cgi-bin/opacexe.exe?op=dig&cat=sub&ref=S:@${EBEtcId}&nx=${EtcCnt}&lang=1&db=Main&pat=&cat=&skin=s&lpp=20&catop=`;
+    }
+  
     // Delete existing records based on conditions
     const deleteQuery = `
       DELETE FROM subject
       WHERE bookId = ? AND name = ?
     `;
-    await connection1.query(deleteQuery, [mainID, bookName]);
+    await connection1.query(deleteQuery, [mainID, strReplace]);
 
     // Insert new records
     const insertQuery = `
-      INSERT INTO subject (bookId, SubCnt, name, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO subject (bookId, SubCnt, name, createdAt, updatedAt, EtcId, Url)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    await connection1.query(insertQuery, [mainID, EtcCnt, bookName, createdAt, updatedAt]);
+    await connection1.query(insertQuery, [mainID, EtcCnt, strReplace, createdAt, updatedAt, EBEtcId, EUrl ]);
 
     await connection1.commit();
   } catch (error) {
