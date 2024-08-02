@@ -750,7 +750,8 @@ router.get('/getBooksByID', async (req, res) => {
     formattedBook.subjects = subjects.map(subject => ({
       SubCnt: subject.SubCnt,
       name: subject.name,
-      EtcId: subject.EtcId
+      EtcId: subject.EtcId,
+      Url: subject.Url
     }));
 
     // Fetch book items for the current book including the image from books table
