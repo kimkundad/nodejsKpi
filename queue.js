@@ -264,6 +264,11 @@ const worker = new Worker('jobQueue', async (job) => {
       await updateAdditionalAuthors(item);
     }
 
+    if(item.EBTag == 710){
+      console.log('updateAdditionalAuthors');
+      await updateAdditionalAuthors(item);
+    }
+
     
   }
 
@@ -1067,7 +1072,7 @@ const updateAdditionalAuthors = async (item) => {
     connection1 = await connectionMysql.getConnection();
     await connection1.beginTransaction();
     
-    const { mainID, EtcCnt, bookName } = item;
+    const { mainID, EtcCnt, bookName, EBEtcId } = item;
     const createdAt = new Date(); // Current timestamp for createdAt
     const updatedAt = new Date(); // Current timestamp for updatedAt
     
@@ -1078,12 +1083,18 @@ const updateAdditionalAuthors = async (item) => {
     `;
     await connection1.query(deleteQuery, [mainID, bookName]);
 
+    let EUrl = null;
+
+    if(EtcCnt > 1){
+      EUrl = `https://www.kpi-lib.com/elib/cgi-bin/opacexe.exe?op=dig&cat=sub&ref=S:@${EBEtcId}&nx=${EtcCnt}&lang=1&db=Main&pat=&cat=&skin=s&lpp=20&catop=`;
+    }
+
     // Insert new records
     const insertQuery = `
-      INSERT INTO AdditionalAuthors (bookId, EtcCnt, name, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO AdditionalAuthors (bookId, EtcCnt, name, createdAt, updatedAt, EEtcBib, Url)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    await connection1.query(insertQuery, [mainID, EtcCnt, bookName, createdAt, updatedAt]);
+    await connection1.query(insertQuery, [mainID, EtcCnt, bookName, createdAt, updatedAt, EBEtcId, EUrl]);
 
     await connection1.commit();
   } catch (error) {

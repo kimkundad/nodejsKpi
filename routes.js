@@ -742,7 +742,8 @@ router.get('/getBooksByID', async (req, res) => {
       bookName: book.bookName,
       subjects: [],
       bookItem: [],
-      bookPdf: []
+      bookPdf: [],
+      AdditionalAuthors: []
     };
 
     // Fetch subjects for the current book
@@ -752,6 +753,15 @@ router.get('/getBooksByID', async (req, res) => {
       name: subject.name,
       EtcId: subject.EtcId,
       Url: subject.Url
+    }));
+
+    // Fetch Additional Authors for the current book
+    const [AdditionalAuthor] = await connection.query('SELECT * FROM AdditionalAuthors WHERE bookId = ?', [book.bookId]);
+    formattedBook.AdditionalAuthors = AdditionalAuthor.map(Additional => ({
+      EtcCnt: Additional.EtcCnt,
+      name: Additional.name,
+      EtcId: Additional.EEtcBib,
+      Url: Additional.Url
     }));
 
     // Fetch book items for the current book including the image from books table
