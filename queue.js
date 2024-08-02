@@ -608,14 +608,14 @@ const insertAuthor = async (item) => {
   try {
     connection1 = await connectionMysql.getConnection();
     await connection1.beginTransaction();
-    const { mainID, CallNumber, bookName } = item;
+    const { mainID, EtcCnt, bookName, EBEtcId } = item;
     const createdAt = new Date(); // Current timestamp for createdAt
     const updatedAt = new Date(); // Current timestamp for updatedAt
     const query = `
-      INSERT INTO books (bookId, bookAuthor, createdAt, updatedAt)
+      INSERT INTO books (bookId, bookAuthor, IDauthor, CountAuthor, createdAt, updatedAt)
       VALUES (?, ?, ?, ?)
     `;
-    await connection1.query(query, [mainID, bookName, createdAt, updatedAt]);
+    await connection1.query(query, [mainID, bookName, EBEtcId, EtcCnt, createdAt, updatedAt]);
     await connection1.commit();
   } catch (error) {
     await connection1.rollback();
@@ -630,16 +630,16 @@ const updateAuthor = async (item) => {
   try {
     connection1 = await connectionMysql.getConnection();
     await connection1.beginTransaction(); // Begin transaction
-    const { mainID, bookName } = item;
+    const { mainID, EtcCnt, bookName, EBEtcId } = item;
     const updatedAt = new Date(); // Current timestamp for updatedAt
 
     const query = `
       UPDATE books
-      SET bookAuthor = ?, updatedAt = ?
+      SET bookAuthor = ?, IDauthor = ?, CountAuthor = ?, updatedAt = ?
       WHERE bookId = ?
     `;
 
-    await connection1.query(query, [bookName, updatedAt, mainID]); // Execute update query
+    await connection1.query(query, [bookName, EBEtcId, EtcCnt, updatedAt, mainID]); // Execute update query
     await connection1.commit(); // Commit transaction
   } catch (error) {
     if (connection1) {
