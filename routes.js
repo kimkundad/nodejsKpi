@@ -884,7 +884,6 @@ router.get('/get_930list', async (req, res) => {
 });
 
 
-
 router.get('/get_930sing', async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -2106,7 +2105,6 @@ router.get('/add_dataBookslist29', async (req, res) => {
 
 
 });
-
 
 //เพิ่มหนังสือมาใหม่ // ECvr
 router.get('/AddNewbooks', async (req, res) => {
