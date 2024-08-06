@@ -1046,9 +1046,9 @@ const updateSubject = async (item) => {
     // Delete existing records based on conditions
     const deleteQuery = `
       DELETE FROM subject
-      WHERE bookId = ? AND name = ?
+      WHERE bookId = ? AND EtcId = ?
     `;
-    await connection1.query(deleteQuery, [mainID, strReplace]);
+    await connection1.query(deleteQuery, [mainID, EBEtcId]);
 
     // Insert new records
     const insertQuery = `
