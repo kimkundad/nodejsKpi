@@ -254,7 +254,7 @@ const worker = new Worker('jobQueue', async (job) => {
       }
     }
 
-    if( (item.EBInd == 4 && item.EBTag == 650) || (item.EBInd == 4 && item.EBTag == 651) ){
+    if( (item.EBInd == 4 && item.EBTag == 650) || (item.EBInd == 4 && item.EBTag == 651) || (item.EBInd == 14 && item.EBTag == 600)){
       console.log('updateSubject');
       await updateSubject(item);
     }
