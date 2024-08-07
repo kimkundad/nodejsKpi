@@ -747,7 +747,7 @@ router.get('/getBooksByID', async (req, res) => {
     };
 
     // Fetch subjects for the current book
-    const [subjects] = await connection.query('SELECT * FROM subject WHERE bookId = ?', [book.bookId]);
+    const [subjects] = await connection.query('SELECT * FROM subject WHERE bookId = ? ORDER BY name ASC', [book.bookId]);
     formattedBook.subjects = subjects.map(subject => ({
       SubCnt: subject.SubCnt,
       name: subject.name,
