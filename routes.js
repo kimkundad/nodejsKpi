@@ -2460,7 +2460,10 @@ router.get('/getNumcollection', async (req, res) => {
   connection = await connectionMysql.getConnection();
   try {
     // เปิดเบราว์เซอร์
-    browser = await puppeteer.launch({ headless: true }); // หรือใช้ { headless: false } หากคุณต้องการเห็นการทำงานของเบราว์เซอร์
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
     await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2' });
     //
