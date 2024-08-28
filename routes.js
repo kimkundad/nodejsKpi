@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const puppeteer = require('puppeteer')
 const {
   sql,
   poolPromise
@@ -481,12 +482,12 @@ router.get('/getCollection', async (req, res) => {
     const collectionIDs = [1, 2, 3, 4, 5, 6, 7]; // ตัวอย่างของ collectionID
     // Fetch getCollection
     const [collections] = await connection.query('SELECT * FROM collection WHERE id IN (?)', [collectionIDs]);
-    // เพิ่มการนับจำนวนหนังสือสำหรับแต่ละคอลเลคชัน
-    for (let i = 0; i < collections.length; i++) {
-      const collection = collections[i];
-      const [bookCountResult] = await connection.query('SELECT COUNT(*) AS count FROM CollectionBookId WHERE collectionId = ?', [collection.id]);
-      collection.bookCount = bookCountResult[0].count;
-    }
+    // // เพิ่มการนับจำนวนหนังสือสำหรับแต่ละคอลเลคชัน
+    // for (let i = 0; i < collections.length; i++) {
+    //   const collection = collections[i];
+    //   const [bookCountResult] = await connection.query('SELECT COUNT(*) AS count FROM CollectionBookId WHERE collectionId = ?', [collection.id]);
+    //   collection.bookCount = bookCountResult[0].count;
+    // }
 
     const responsez = {
       collections
@@ -2451,6 +2452,82 @@ router.get('/editEbook', async (req, res) => {
   }
 });
 
+//ดึงตัวเลข collection
+
+router.get('/getNumcollection', async (req, res) => {
+  let browser;
+  let connection;
+  connection = await connectionMysql.getConnection();
+  try {
+    // เปิดเบราว์เซอร์
+    browser = await puppeteer.launch({ headless: true }); // หรือใช้ { headless: false } หากคุณต้องการเห็นการทำงานของเบราว์เซอร์
+    const page = await browser.newPage();
+    await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2' });
+    //
+
+
+    // วารสารสถาบันพระปกเกล้า - tr:nth-child(9)
+    // สิ่งพิมพ์สถาบันพระปกเกล้า - tr:nth-child(11)
+    // รายงานนักศึกษาสถาบันพระปกเกล้า - tr:nth-child(7)
+    // ผลงานนักวิชาการ - tr:nth-child(5)
+    // พระปกเกล้าศึกษา - tr:nth-child(6)
+    // หนังสืออนุสรณ์งานศพนักการเมือง - tr:nth-child(12)
+    // งานวิจัยสถาบันพระปกเกล้า - tr:nth-child(4)
+    // วิทยานิพนธ์ - tr:nth-child(10)
+    // รายงานประจำปี - tr:nth-child(8)
+
+    // รอและดึงข้อมูลจากองค์ประกอบที่ต้องการ 
+    // const element = await page.waitForSelector('div.container > div.row.container > div > div > table > tbody > tr:nth-child(9) > td.res_rs_td_hit');
+    // const text1 = await page.evaluate(el => el.textContent, element);
+
+    // const query1 = `
+    //   UPDATE collection
+    //   SET bookCount = ?
+    //   WHERE id = 1
+    // `;
+    // await connection.query(query1, text1); // Execute update query
+
+
+    // ข้อมูลที่ต้องการดึง
+    const selectors = [
+      { id: 1, selector: 'tr:nth-child(9) > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
+      { id: 2, selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
+      { id: 3, selector: 'tr:nth-child(7) > td.res_rs_td_hit' },  // รายงานนักศึกษาสถาบันพระปกเกล้า
+      { id: 4, selector: 'tr:nth-child(5) > td.res_rs_td_hit' },  // ผลงานนักวิชาการ
+      { id: 5, selector: 'tr:nth-child(6) > td.res_rs_td_hit' },  // พระปกเกล้าศึกษา
+      { id: 6, selector: 'tr:nth-child(12) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
+      { id: 7, selector: 'tr:nth-child(4) > td.res_rs_td_hit' },  // งานวิจัยสถาบันพระปกเกล้า
+      { id: 9, selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // วิทยานิพนธ์
+      { id: 10, selector: 'tr:nth-child(8) > td.res_rs_td_hit' }   // รายงานประจำปี
+    ];
+
+    const updatedAt = new Date();
+
+    // ดึงข้อมูลและอัปเดตฐานข้อมูล
+    for (const item of selectors) {
+      const element = await page.waitForSelector(`div.container > div.row.container > div > div > table > tbody > ${item.selector}`);
+      const text = await page.evaluate(el => el.textContent, element);
+      
+      const query = `
+        UPDATE collection
+        SET bookCount = ?, update_at = ?
+        WHERE id = ?
+      `;
+      await connection.query(query, [text, updatedAt, item.id]);
+    }
+
+    res.send('Data updated successfully'); // ส่งข้อความตอบกลับ
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).send('An error occurred');
+  } finally {
+    // ปิดเบราว์เซอร์
+    if (browser) {
+      await browser.close();
+    }
+  }
+});
 
 function formatImageName(imageName) {
   // Extract the numeric part of the image name, assuming it does not include the file extension

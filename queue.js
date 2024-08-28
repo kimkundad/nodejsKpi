@@ -189,6 +189,7 @@ const worker = new Worker('jobQueue', async (job) => {
       item.bookName = item.bookName.replace(/\\nEbook\\uhttps:\/\/po/, 'https://po');
       item.bookName = item.bookName.replace(/\\nEbook\\uhttps:\/\/ebookcentral/, 'https://ebookcentral');
       item.bookName = item.bookName.replace(/\\nEbook\\uhttps:\/\/doi\.org\//, 'https://doi.org/');
+      item.bookName = item.bookName.replace(/\\nEbook ล.1\\u%UrlRedir1%\//, 'https://kpi-lib.com/');
 
       if (existingRecord) {
         console.log('updateEbook');
