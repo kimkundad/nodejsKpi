@@ -154,6 +154,8 @@ router.get('/dataBookOne', async (req, res) => {
   }
 });
 
+// ssh root@209.15.114.122
+//https://kpilib-api.ideavivat.com/dataBookOne2?bookId=31509
 // http://localhost:3000/dataBookOne?bookId=31515 vs
 router.get('/dataBookOne2', async (req, res) => {
   try {
@@ -2419,6 +2421,30 @@ router.get('/add_dataBookslist99', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching item data:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
+    });
+  }
+});
+
+
+//แก้ไข ebook
+router.get('/editEbook', async (req, res) => {
+
+  let connection;
+  connection = await connectionMysql.getConnection();
+
+  try {
+      // Fetch ebook
+      const [result] = await connection.query('SELECT * FROM books WHERE ebook IS NOT NULL');
+
+      const bookIDs = result.map(record => record.bookId);
+  //  console.log('Addrecomment-->', bookIDs)
+    await insertBooks(bookIDs);
+    
+    res.json(bookIDs);
+  } catch (err) {
+    console.error('Error fetching recommendations:', err);
     res.status(500).json({
       error: 'Internal Server Error'
     });
