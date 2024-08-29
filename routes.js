@@ -2465,31 +2465,8 @@ router.get('/getNumcollection', async (req, res) => {
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const page = await browser.newPage();
-    await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2' });
+    await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2', timeout: 30000 });
     //
-
-
-    // วารสารสถาบันพระปกเกล้า - tr:nth-child(9)
-    // สิ่งพิมพ์สถาบันพระปกเกล้า - tr:nth-child(11)
-    // รายงานนักศึกษาสถาบันพระปกเกล้า - tr:nth-child(7)
-    // ผลงานนักวิชาการ - tr:nth-child(5)
-    // พระปกเกล้าศึกษา - tr:nth-child(6)
-    // หนังสืออนุสรณ์งานศพนักการเมือง - tr:nth-child(12)
-    // งานวิจัยสถาบันพระปกเกล้า - tr:nth-child(4)
-    // วิทยานิพนธ์ - tr:nth-child(10)
-    // รายงานประจำปี - tr:nth-child(8)
-
-    // รอและดึงข้อมูลจากองค์ประกอบที่ต้องการ 
-    // const element = await page.waitForSelector('div.container > div.row.container > div > div > table > tbody > tr:nth-child(9) > td.res_rs_td_hit');
-    // const text1 = await page.evaluate(el => el.textContent, element);
-
-    // const query1 = `
-    //   UPDATE collection
-    //   SET bookCount = ?
-    //   WHERE id = 1
-    // `;
-    // await connection.query(query1, text1); // Execute update query
-
 
     // ข้อมูลที่ต้องการดึง
     const selectors = [
@@ -2508,7 +2485,7 @@ router.get('/getNumcollection', async (req, res) => {
 
     // ดึงข้อมูลและอัปเดตฐานข้อมูล
     for (const item of selectors) {
-      const element = await page.waitForSelector(`div.container > div.row.container > div > div > table > tbody > ${item.selector}`);
+      const element = await page.waitForSelector(`div.container > div.row.container > div > div > table > tbody > ${item.selector}`, { timeout: 5000 });
       const text = await page.evaluate(el => el.textContent, element);
       
       const query = `
@@ -2528,6 +2505,10 @@ router.get('/getNumcollection', async (req, res) => {
     // ปิดเบราว์เซอร์
     if (browser) {
       await browser.close();
+    }
+    // ปล่อย connection กลับไปยัง pool
+    if (connection) {
+      connection.release();
     }
   }
 });
