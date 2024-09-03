@@ -629,13 +629,45 @@ router.get('/getBooksByCollectionID', async (req, res) => {
     const offset = (page - 1) * pageSize; // Offset calculation
 
     // Fetch books by collectionID with pagination
+    // const [books] = await connection.query(
+    //   'SELECT * FROM CollectionBookId WHERE collectionId = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
+    //   [collectionID, pageSize, offset]
+    // );
+
+    // const [books] = await connection.query(
+    //   'SELECT * ,cb.collectionId AS collection_id, cb.bookId AS collection_book_id, b.bookId AS book_id, b.bookName AS book_name FROM CollectionBookId cb JOIN books b ON cb.bookId = b.bookId WHERE cb.collectionId = ? ORDER BY cb.bookId DESC LIMIT ? OFFSET ?',
+    //   [collectionID, pageSize, offset]
+    // );
+
     const [books] = await connection.query(
-      'SELECT * FROM books WHERE collectionID = ? ORDER BY bookId DESC LIMIT ? OFFSET ?',
+      `SELECT DISTINCT cb.bookId, cb.collectionId AS collectionId, cb.bookId AS collection_book_id, 
+       b.bookId AS bookId, b.bookName AS bookName ,
+       b.bookNameEn,
+       b.bookAuthor,
+       b.isbn,
+       b.ImPrint,
+       b.callNumber,
+       b.physical,
+       b.bookContent,
+       b.LocaCode,
+       b.image,
+       b.note,
+       b.ebook,
+       b.CurrentEditionAvailable,
+       b.IDauthor,
+       b.CountAuthor,
+       c.name AS PublicationType
+       FROM CollectionBookId cb 
+       JOIN books b ON cb.bookId = b.bookId 
+       JOIN collection c ON cb.collectionId = c.id
+       WHERE cb.collectionId = ? 
+       ORDER BY cb.bookId DESC 
+       LIMIT ? OFFSET ?`,
       [collectionID, pageSize, offset]
     );
 
     const [results] = await connection.query(
-      'SELECT COUNT(*) as totalBooks FROM books WHERE collectionID = ?',
+      'SELECT COUNT(DISTINCT bookId) as totalBooks FROM CollectionBookId WHERE collectionId = ?',
       [collectionID]
     );
 
