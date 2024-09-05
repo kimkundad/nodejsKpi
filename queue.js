@@ -265,12 +265,12 @@ const worker = new Worker('jobQueue', async (job) => {
       }
     }
 
-    if( (item.EBInd == 4 && item.EBTag == 650) || (item.EBInd == 4 && item.EBTag == 651) || (item.EBInd == 14 && item.EBTag == 600)){
+    if( (item.EBTag == 650) || (item.EBInd == 4 && item.EBTag == 651) || (item.EBInd == 14 && item.EBTag == 600) || (item.EBTag == 653)){
       console.log('updateSubject');
       await updateSubject(item);
     }
 
-    if(item.EBInd == 0 && item.EBTag == 700){
+    if(item.EBTag == 700){
       console.log('updateAdditionalAuthors');
       await updateAdditionalAuthors(item);
     }
