@@ -2486,64 +2486,175 @@ router.get('/editEbook', async (req, res) => {
 
 //ดึงตัวเลข collection
 
-router.get('/getNumcollection', async (req, res) => {
-  let browser;
-  let connection;
-  connection = await connectionMysql.getConnection();
-  try {
-    // เปิดเบราว์เซอร์
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2', timeout: 30000 });
-    //
+// router.get('/getNumcollection', async (req, res) => {
+//   let browser;
+//   let connection;
+//   connection = await connectionMysql.getConnection();
+//   try {
+//     // เปิดเบราว์เซอร์
+//     browser = await puppeteer.launch({
+//       headless: true,
+//       args: ['--no-sandbox', '--disable-setuid-sandbox']
+//     });
+//     const page = await browser.newPage();
+//     await page.goto('https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50', { waitUntil: 'networkidle2', timeout: 30000 });
+//     //
 
-    // ข้อมูลที่ต้องการดึง
-    const selectors = [
-      { id: 1, selector: 'tr:nth-child(9) > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
-      { id: 2, selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
-      { id: 3, selector: 'tr:nth-child(7) > td.res_rs_td_hit' },  // รายงานนักศึกษาสถาบันพระปกเกล้า
-      { id: 4, selector: 'tr:nth-child(5) > td.res_rs_td_hit' },  // ผลงานนักวิชาการ
-      { id: 5, selector: 'tr:nth-child(6) > td.res_rs_td_hit' },  // พระปกเกล้าศึกษา
-      { id: 6, selector: 'tr:nth-child(12) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
-      { id: 7, selector: 'tr:nth-child(4) > td.res_rs_td_hit' },  // งานวิจัยสถาบันพระปกเกล้า
-      { id: 9, selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // วิทยานิพนธ์
-      { id: 10, selector: 'tr:nth-child(8) > td.res_rs_td_hit' }   // รายงานประจำปี
-    ];
+//     // ข้อมูลที่ต้องการดึง
+//     const selectors = [
+//       { id: 1, selector: 'tr:nth-child(9) > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
+//       { id: 2, selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
+//       { id: 3, selector: 'tr:nth-child(7) > td.res_rs_td_hit' },  // รายงานนักศึกษาสถาบันพระปกเกล้า
+//       { id: 4, selector: 'tr:nth-child(5) > td.res_rs_td_hit' },  // ผลงานนักวิชาการ
+//       { id: 5, selector: 'tr:nth-child(6) > td.res_rs_td_hit' },  // พระปกเกล้าศึกษา
+//       { id: 6, selector: 'tr:nth-child(12) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
+//       { id: 7, selector: 'tr:nth-child(4) > td.res_rs_td_hit' },  // งานวิจัยสถาบันพระปกเกล้า
+//       { id: 9, selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // วิทยานิพนธ์
+//       { id: 10, selector: 'tr:nth-child(8) > td.res_rs_td_hit' }   // รายงานประจำปี
+//     ];
+
+//     const updatedAt = new Date();
+
+//     // ดึงข้อมูลและอัปเดตฐานข้อมูล
+//     for (const item of selectors) {
+//       const element = await page.waitForSelector(`div.container > div.row.container > div > div > table > tbody > ${item.selector}`, { timeout: 5000 });
+//       const text = await page.evaluate(el => el.textContent, element);
+      
+//       const query = `
+//         UPDATE collection
+//         SET bookCount = ?, update_at = ?
+//         WHERE id = ?
+//       `;
+//       await connection.query(query, [text, updatedAt, item.id]);
+//     }
+
+//     res.send('Data updated successfully'); // ส่งข้อความตอบกลับ
+
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).send('An error occurred');
+//   } finally {
+//     // ปิดเบราว์เซอร์
+//     if (browser) {
+//       await browser.close();
+//     }
+//     // ปล่อย connection กลับไปยัง pool
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// });
+
+
+router.get('/getNumcollection', async (req, res) => {
+  let browser, connection;
+  const URL = 'https://kpi-lib.com/elib/cgi-bin/opacexe.exe?op=brw&lang=1&skin=S&db=Main&frm=simsch&cat=alt930&pat=&db=Main&etz.930=&f8lang=&f8pubplace=&i.location=&i.itemclss=&selected_mm=&f8date1=&f8date2=&lpp=50';
+
+  // คำที่ใช้แมตช์ในแต่ละแถว (จับคู่ด้วยข้อความ ไม่ใช่ตำแหน่ง)
+  const targets = [
+    { id: 1,  pattern: /วารสารสถาบันพระปกเกล้า/i },
+    { id: 2,  pattern: /สิ่งพิมพ์สถาบันพระปกเกล้า/i },
+    { id: 3,  pattern: /รายงานนักศึกษาสถาบันพระปกเกล้า/i },
+    { id: 4,  pattern: /ผลงานนักวิชาการ/i },
+    { id: 5,  pattern: /พระปกเกล้าศึกษา/i },
+    { id: 6,  pattern: /หนังสืออนุสรณ์งานศพนักการเมือง/i },
+    { id: 7,  pattern: /งานวิจัยสถาบันพระปกเกล้า/i },
+    { id: 9,  pattern: /วิทยานิพนธ์/i },
+    { id: 10, pattern: /รายงานประจำปี/i },
+  ];
+
+  try {
+    connection = await connectionMysql.getConnection();
+
+    browser = await puppeteer.launch({
+      headless: 'new',               // หรือ true
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(45000);
+    page.setDefaultTimeout(20000);
+    await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36');
+
+    await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForSelector('table tbody', { timeout: 20000 });
+
+    // ดึงทุกแถว แล้วเอา text + จำนวน (ใน td.res_rs_td_hit) มาทีเดียว
+    const rows = await page.$$eval('table tbody tr', trs => {
+      return trs.map(tr => {
+        const text = tr.innerText.replace(/\s+/g, ' ').trim();
+        const hitCell = tr.querySelector('td.res_rs_td_hit');
+        const hit = hitCell ? hitCell.textContent.replace(/[^\d]/g, '').trim() : null;
+        return { text, hit };
+      });
+    });
 
     const updatedAt = new Date();
+    for (const t of targets) {
+      // หาแถวที่ข้อความตรงกับ pattern
+      const row = rows.find(r => t.pattern.test(r.text));
+      if (!row || !row.hit) {
+        // ลอง refresh/รอสั้น ๆ แล้วดึงใหม่อีก 1-2 ครั้ง (retry เบา ๆ ต่อ item)
+        let retryHit = null;
+        for (let i = 0; i < 2 && !retryHit; i++) {
+          await page.waitForTimeout(2000);
+          const reRows = await page.$$eval('table tbody tr', trs => trs.map(tr => {
+            const text = tr.innerText.replace(/\s+/g, ' ').trim();
+            const hitCell = tr.querySelector('td.res_rs_td_hit');
+            const hit = hitCell ? hitCell.textContent.replace(/[^\d]/g, '').trim() : null;
+            return { text, hit };
+          }));
+          const reRow = reRows.find(r => t.pattern.test(r.text));
+          retryHit = reRow?.hit ?? null;
+        }
 
-    // ดึงข้อมูลและอัปเดตฐานข้อมูล
-    for (const item of selectors) {
-      const element = await page.waitForSelector(`div.container > div.row.container > div > div > table > tbody > ${item.selector}`, { timeout: 5000 });
-      const text = await page.evaluate(el => el.textContent, element);
-      
-      const query = `
-        UPDATE collection
-        SET bookCount = ?, update_at = ?
-        WHERE id = ?
-      `;
-      await connection.query(query, [text, updatedAt, item.id]);
+        if (!retryHit) {
+          // เขียน log ไว้ตรวจทีหลัง แต่ไม่ให้ทั้งงานล้ม
+          console.warn(`WARN: Not found/missing hit for id=${t.id} pattern=${t.pattern}`);
+          continue;
+        }
+
+        await connection.query(
+          'UPDATE collection SET bookCount = ?, update_at = ? WHERE id = ?',
+          [retryHit, updatedAt, t.id]
+        );
+        continue;
+      }
+
+      await connection.query(
+        'UPDATE collection SET bookCount = ?, update_at = ? WHERE id = ?',
+        [row.hit, updatedAt, t.id]
+      );
     }
 
-    res.send('Data updated successfully'); // ส่งข้อความตอบกลับ
-
-  } catch (error) {
-    console.error('Error:', error);
+    res.send('Data updated successfully');
+  } catch (err) {
+    console.error('Error:', err);
+    // เก็บหลักฐานไว้ debug
+    try {
+      if (browser?.pages) {
+        const [p] = await browser.pages();
+        if (p) {
+          await p.screenshot({ path: '/tmp/kpi_fail.png', fullPage: true });
+          const html = await p.content();
+          require('fs').writeFileSync('/tmp/kpi_fail.html', html);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to capture debug artifacts:', e);
+    }
     res.status(500).send('An error occurred');
   } finally {
-    // ปิดเบราว์เซอร์
-    if (browser) {
-      await browser.close();
-    }
-    // ปล่อย connection กลับไปยัง pool
-    if (connection) {
-      connection.release();
-    }
+    if (browser) await browser.close();
+    if (connection) connection.release();
   }
 });
+
 
 function formatImageName(imageName) {
   // Extract the numeric part of the image name, assuming it does not include the file extension
