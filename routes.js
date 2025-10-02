@@ -2501,16 +2501,28 @@ router.get('/getNumcollection', async (req, res) => {
     //
 
     // ข้อมูลที่ต้องการดึง
+    // const selectors = [
+    //   { id: 1, selector: 'tr:nth-child(9) > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
+    //   { id: 2, selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
+    //   { id: 3, selector: 'tr:nth-child(7) > td.res_rs_td_hit' },  // รายงานนักศึกษาสถาบันพระปกเกล้า
+    //   { id: 4, selector: 'tr:nth-child(5) > td.res_rs_td_hit' },  // ผลงานนักวิชาการ
+    //   { id: 5, selector: 'tr:nth-child(6) > td.res_rs_td_hit' },  // พระปกเกล้าศึกษา
+    //   { id: 6, selector: 'tr:nth-child(12) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
+    //   { id: 7, selector: 'tr:nth-child(4) > td.res_rs_td_hit' },  // งานวิจัยสถาบันพระปกเกล้า
+    //   { id: 9, selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // วิทยานิพนธ์
+    //   { id: 10, selector: 'tr:nth-child(8) > td.res_rs_td_hit' }   // รายงานประจำปี
+    // ];
+
     const selectors = [
-      { id: 1, selector: 'tr:nth-child(9) > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
-      { id: 2, selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
-      { id: 3, selector: 'tr:nth-child(7) > td.res_rs_td_hit' },  // รายงานนักศึกษาสถาบันพระปกเกล้า
-      { id: 4, selector: 'tr:nth-child(5) > td.res_rs_td_hit' },  // ผลงานนักวิชาการ
-      { id: 5, selector: 'tr:nth-child(6) > td.res_rs_td_hit' },  // พระปกเกล้าศึกษา
-      { id: 6, selector: 'tr:nth-child(12) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
-      { id: 7, selector: 'tr:nth-child(4) > td.res_rs_td_hit' },  // งานวิจัยสถาบันพระปกเกล้า
-      { id: 9, selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // วิทยานิพนธ์
-      { id: 10, selector: 'tr:nth-child(8) > td.res_rs_td_hit' }   // รายงานประจำปี
+      { id: 1,  selector: 'tr:nth-child(8)  > td.res_rs_td_hit' }, // วารสารสถาบันพระปกเกล้า
+      { id: 2,  selector: 'tr:nth-child(10) > td.res_rs_td_hit' }, // สิ่งพิมพ์สถาบันพระปกเกล้า
+      { id: 3,  selector: 'tr:nth-child(7)  > td.res_rs_td_hit' }, // รายงานนักศึกษาสถาบันพระปกเกล้า
+      { id: 4,  selector: 'tr:nth-child(5)  > td.res_rs_td_hit' }, // ผลงานนักวิชาการ
+      { id: 5,  selector: 'tr:nth-child(6)  > td.res_rs_td_hit' }, // พระปกเกล้าศึกษา
+      { id: 6,  selector: 'tr:nth-child(11) > td.res_rs_td_hit' }, // หนังสืออนุสรณ์งานศพนักการเมือง
+      { id: 7,  selector: 'tr:nth-child(4)  > td.res_rs_td_hit' }, // งานวิจัยสถาบันพระปกเกล้า
+      { id: 9,  selector: 'tr:nth-child(9)  > td.res_rs_td_hit' }, // วิทยานิพนธ์
+      // { id: 10, ... } // รายงานประจำปี: ไม่พบในหน้าที่แนบ
     ];
 
     const updatedAt = new Date();
